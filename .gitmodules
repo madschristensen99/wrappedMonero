@@ -1,0 +1,6 @@
+[submodule "webui/lit-pkp-auth-demo"]
+	path = webui/lit-pkp-auth-demo
+	url = https://github.com/LIT-Protocol/lit-pkp-auth-demo.git
+[submodule "webui/monero-ts"]
+	path = webui/monero-ts
+	url = https://github.com/woodser/monero-ts.git

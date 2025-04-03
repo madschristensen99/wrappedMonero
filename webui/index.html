@@ -1,0 +1,1871 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WXMR Bridge - Atomic Swaps between XMR and EVM</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/web3/1.8.2/web3.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/ethers/5.7.2/ethers.umd.min.js"></script>
+    <style>
+        :root {
+            --primary-color: #3B82F6;
+            --secondary-color: #34D399;
+            --accent-color: #F59E0B;
+            --background-color: #F3F4F6;
+            --card-bg: #FFFFFF;
+            --text-color: #374151;
+            --text-muted: #6B7280;
+            --border-color: #E5E7EB;
+            --success-color: #10B981;
+            --error-color: #EF4444;
+            --warning-color: #F59E0B;
+            --heading-color: #1F2937;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Open Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+        }
+
+        body {
+            background-color: var(--background-color);
+            color: var(--text-color);
+            line-height: 1.6;
+        }
+
+        .container {
+            max-width: 1100px;
+            margin: 0 auto;
+            padding: 1rem;
+        }
+
+        header {
+            background-color: var(--card-bg);
+            padding: 1rem 0;
+            border-bottom: 1px solid var(--border-color);
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+        }
+
+        .header-content {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .logo {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            font-size: 1.5rem;
+            font-weight: 700;
+            color: var(--heading-color);
+        }
+
+        .logo-icon {
+            color: var(--primary-color);
+        }
+
+        .connect-wallet {
+            background-color: var(--primary-color);
+            color: white;
+            border: none;
+            padding: 0.6rem 1.2rem;
+            border-radius: 1.5rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: background-color 0.3s, transform 0.2s;
+            box-shadow: 0 2px 4px rgba(59, 130, 246, 0.3);
+        }
+
+        .connect-wallet:hover {
+            background-color: #2563EB;
+            transform: translateY(-2px);
+        }
+
+        .connected-wallet {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            background-color: #EEF2FF;
+            padding: 0.5rem 1rem;
+            border-radius: 1.5rem;
+            font-size: 0.875rem;
+            border: 1px solid #C7D2FE;
+        }
+
+        .wallet-address {
+            font-family: monospace;
+            color: var(--heading-color);
+        }
+
+        .balance-info {
+            margin-top: 0.25rem;
+            font-size: 0.75rem;
+            color: var(--text-muted);
+        }
+
+        .tab-navigation {
+            display: flex;
+            margin-top: 1.5rem;
+            background-color: var(--card-bg);
+            border-radius: 0.75rem;
+            padding: 0.5rem;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+        }
+
+        .tab-button {
+            padding: 0.75rem 1.25rem;
+            background: none;
+            border: none;
+            color: var(--text-muted);
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+            border-radius: 0.5rem;
+            flex: 1;
+            text-align: center;
+        }
+
+        .tab-button.active {
+            color: var(--primary-color);
+            background-color: #EEF2FF;
+        }
+
+        .tab-button:hover:not(.active) {
+            background-color: #F9FAFB;
+            color: var(--heading-color);
+        }
+
+        .tab-content {
+            padding: 1.5rem 0;
+            display: none;
+        }
+
+        .tab-content.active {
+            display: block;
+        }
+
+        .card {
+            background-color: var(--card-bg);
+            border-radius: 1rem;
+            padding: 1.5rem;
+            margin-bottom: 1.5rem;
+            border: 1px solid var(--border-color);
+            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.05);
+            transition: transform 0.3s, box-shadow 0.3s;
+        }
+
+        .card:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+        }
+
+        .card-header {
+            margin-bottom: 1.5rem;
+        }
+
+        .card-title {
+            font-size: 1.25rem;
+            font-weight: 700;
+            margin-bottom: 0.5rem;
+            color: var(--heading-color);
+        }
+
+        .card-subtitle {
+            color: var(--text-muted);
+            font-size: 0.875rem;
+        }
+
+        .form-group {
+            margin-bottom: 1.5rem;
+        }
+
+        .form-label {
+            display: block;
+            margin-bottom: 0.5rem;
+            font-weight: 600;
+            color: var(--heading-color);
+        }
+
+        .form-control {
+            width: 100%;
+            padding: 0.75rem 1rem;
+            background-color: #F9FAFB;
+            border: 1px solid var(--border-color);
+            border-radius: 0.75rem;
+            color: var(--text-color);
+            font-size: 1rem;
+            transition: border-color 0.3s, box-shadow 0.3s;
+        }
+
+        .form-control:focus {
+            outline: none;
+            border-color: var(--primary-color);
+            box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+        }
+
+        .input-group {
+            display: flex;
+            align-items: center;
+        }
+
+        .input-group .form-control {
+            border-top-right-radius: 0;
+            border-bottom-right-radius: 0;
+            border-right: none;
+        }
+
+        .input-group-append {
+            background-color: #F9FAFB;
+            border: 1px solid var(--border-color);
+            border-left: none;
+            padding: 0.75rem 1rem;
+            border-top-right-radius: 0.75rem;
+            border-bottom-right-radius: 0.75rem;
+            color: var(--text-muted);
+            font-weight: 600;
+        }
+
+        .button-primary {
+            background-color: var(--primary-color);
+            color: white;
+            border: none;
+            padding: 0.75rem 1.5rem;
+            border-radius: 0.75rem;
+            font-weight: 600;
+            width: 100%;
+            cursor: pointer;
+            transition: all 0.3s;
+            box-shadow: 0 2px 4px rgba(59, 130, 246, 0.3);
+            text-align: center;
+        }
+
+        .button-primary:hover {
+            background-color: #2563EB;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 8px rgba(59, 130, 246, 0.4);
+        }
+
+        .button-secondary {
+            background-color: #F9FAFB;
+            color: var(--text-color);
+            border: 1px solid var(--border-color);
+            padding: 0.75rem 1.5rem;
+            border-radius: 0.75rem;
+            font-weight: 600;
+            width: 100%;
+            cursor: pointer;
+            transition: all 0.3s;
+            text-align: center;
+        }
+
+        .button-secondary:hover {
+            background-color: #F3F4F6;
+            border-color: #D1D5DB;
+        }
+
+        .button-disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+        }
+
+        .button-disabled:hover {
+            transform: none;
+            box-shadow: 0 2px 4px rgba(59, 130, 246, 0.3);
+        }
+
+        .button-group {
+            display: flex;
+            gap: 1rem;
+        }
+
+        .button-group .button-primary,
+        .button-group .button-secondary {
+            width: auto;
+        }
+
+        .alert {
+            padding: 1rem;
+            border-radius: 0.75rem;
+            margin-bottom: 1.5rem;
+            border-left: 4px solid transparent;
+        }
+
+        .alert-success {
+            background-color: #ECFDF5;
+            border-color: var(--success-color);
+            color: #065F46;
+        }
+
+        .alert-error {
+            background-color: #FEF2F2;
+            border-color: var(--error-color);
+            color: #991B1B;
+        }
+
+        .alert-warning {
+            background-color: #FFFBEB;
+            border-color: var(--warning-color);
+            color: #92400E;
+        }
+
+        .fee-info {
+            margin-top: 1rem;
+            padding: 1rem;
+            background-color: #EEF2FF;
+            border-radius: 0.75rem;
+            font-size: 0.875rem;
+            color: var(--text-muted);
+            border: 1px solid #C7D2FE;
+        }
+
+        .fee-info span {
+            color: var(--primary-color);
+            font-weight: 600;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 1rem;
+            background-color: var(--card-bg);
+            border-radius: 0.75rem;
+            overflow: hidden;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+        }
+
+        th, td {
+            padding: 0.875rem 1rem;
+            text-align: left;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        th {
+            font-weight: 600;
+            color: var(--heading-color);
+            background-color: #F9FAFB;
+        }
+
+        tr:last-child td {
+            border-bottom: none;
+        }
+
+        tr:hover {
+            background-color: #F9FAFB;
+        }
+
+        .status-badge {
+            display: inline-block;
+            padding: 0.25rem 0.75rem;
+            border-radius: 1rem;
+            font-size: 0.75rem;
+            font-weight: 600;
+        }
+
+        .status-pending {
+            background-color: #FFFBEB;
+            color: #92400E;
+        }
+
+        .status-completed {
+            background-color: #ECFDF5;
+            color: #065F46;
+        }
+
+        .status-refunded {
+            background-color: #FEF2F2;
+            color: #991B1B;
+        }
+
+        .swap-details-modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.4);
+            z-index: 1000;
+            justify-content: center;
+            align-items: center;
+            backdrop-filter: blur(3px);
+        }
+
+        .modal-content {
+            background-color: var(--card-bg);
+            border-radius: 1rem;
+            padding: 2rem;
+            max-width: 550px;
+            width: 100%;
+            max-height: 80vh;
+            overflow-y: auto;
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.15);
+        }
+
+        .modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 1.5rem;
+        }
+
+        .modal-title {
+            font-size: 1.25rem;
+            font-weight: 700;
+            color: var(--heading-color);
+        }
+
+        .close-modal {
+            background: none;
+            border: none;
+            color: var(--text-muted);
+            font-size: 1.5rem;
+            cursor: pointer;
+            transition: color 0.2s;
+        }
+
+        .close-modal:hover {
+            color: var(--heading-color);
+        }
+
+        .detail-row {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 1rem;
+            padding-bottom: 1rem;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .detail-label {
+            font-weight: 600;
+            color: var(--text-muted);
+        }
+
+        .detail-value {
+            font-family: monospace;
+            max-width: 60%;
+            overflow-wrap: break-word;
+            text-align: right;
+            color: var(--heading-color);
+        }
+
+        .secret-input-container {
+            display: none;
+            margin-top: 1.5rem;
+        }
+
+        .loading-spinner {
+            display: inline-block;
+            width: 1.5rem;
+            height: 1.5rem;
+            border: 2px solid rgba(59, 130, 246, 0.1);
+            border-left-color: var(--primary-color);
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin-right: 0.5rem;
+        }
+
+        @keyframes spin {
+            100% {
+                transform: rotate(360deg);
+            }
+        }
+
+        .steps-container {
+            margin-top: 1.5rem;
+        }
+
+        .step {
+            display: flex;
+            margin-bottom: 1.5rem;
+        }
+
+        .step-number {
+            width: 2rem;
+            height: 2rem;
+            border-radius: 50%;
+            background-color: #F3F4F6;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 700;
+            margin-right: 1rem;
+            flex-shrink: 0;
+            color: var(--text-muted);
+            border: 1px solid var(--border-color);
+        }
+
+        .step.active .step-number {
+            background-color: var(--primary-color);
+            color: white;
+            border-color: var(--primary-color);
+        }
+
+        .step-content {
+            padding-top: 0.25rem;
+        }
+
+        .step-title {
+            font-weight: 600;
+            margin-bottom: 0.25rem;
+            color: var(--heading-color);
+        }
+
+        .step-description {
+            color: var(--text-muted);
+            font-size: 0.875rem;
+        }
+
+        .countdown {
+            font-family: monospace;
+            font-weight: 700;
+            color: var(--warning-color);
+        }
+
+        .qr-code-container {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            margin: 1.5rem 0;
+        }
+
+        .qr-code {
+            width: 200px;
+            height: 200px;
+            background-color: white;
+            padding: 1rem;
+            border-radius: 0.75rem;
+            margin-bottom: 1rem;
+            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+            border: 1px solid var(--border-color);
+        }
+
+        .address-display {
+            font-family: monospace;
+            background-color: #F9FAFB;
+            padding: 0.75rem;
+            border-radius: 0.75rem;
+            width: 100%;
+            text-align: center;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            position: relative;
+            border: 1px solid var(--border-color);
+            color: var(--heading-color);
+        }
+
+        .copy-button {
+            position: absolute;
+            right: 0.5rem;
+            top: 50%;
+            transform: translateY(-50%);
+            background: none;
+            border: none;
+            color: var(--text-muted);
+            cursor: pointer;
+            transition: color 0.2s;
+        }
+
+        .copy-button:hover {
+            color: var(--primary-color);
+        }
+
+        .step-action {
+            margin-top: 1rem;
+        }
+
+        .accordion {
+            margin-bottom: 1.5rem;
+            border-radius: 0.75rem;
+            overflow: hidden;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+            border: 1px solid var(--border-color);
+        }
+
+        .accordion-header {
+            padding: 1rem 1.5rem;
+            background-color: var(--card-bg);
+            cursor: pointer;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            transition: background-color 0.2s;
+        }
+
+        .accordion-header:hover {
+            background-color: #F9FAFB;
+        }
+
+        .accordion-title {
+            font-weight: 600;
+            color: var(--heading-color);
+        }
+
+        .accordion-icon {
+            color: var(--text-muted);
+            transition: transform 0.3s;
+        }
+
+        .accordion-content {
+            max-height: 0;
+            overflow: hidden;
+            transition: max-height 0.3s ease-out;
+            background-color: var(--card-bg);
+        }
+
+        .accordion-inner {
+            padding: 1.5rem;
+            border-top: 1px solid var(--border-color);
+        }
+
+        .accordion.active .accordion-icon {
+            transform: rotate(180deg);
+            color: var(--primary-color);
+        }
+
+        .accordion.active .accordion-content {
+            max-height: 500px;
+        }
+
+        .tabs-secondary {
+            display: flex;
+            margin-bottom: 1.5rem;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .tab-secondary {
+            padding: 0.75rem 1.25rem;
+            cursor: pointer;
+            color: var(--text-muted);
+            font-weight: 600;
+            border-bottom: 2px solid transparent;
+            transition: all 0.2s;
+        }
+
+        .tab-secondary.active {
+            color: var(--primary-color);
+            border-bottom: 2px solid var(--primary-color);
+        }
+
+        .tab-secondary:hover:not(.active) {
+            color: var(--heading-color);
+        }
+
+        .tab-pane {
+            display: none;
+        }
+
+        .tab-pane.active {
+            display: block;
+        }
+
+        .stats-container {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+            gap: 1rem;
+            margin-bottom: 1.5rem;
+        }
+
+        .stat-card {
+            background-color: var(--card-bg);
+            border-radius: 0.75rem;
+            padding: 1.5rem;
+            border: 1px solid var(--border-color);
+            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.05);
+            transition: transform 0.3s, box-shadow 0.3s;
+        }
+
+        .stat-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.08);
+        }
+
+        .stat-title {
+            font-size: 0.875rem;
+            color: var(--text-muted);
+            margin-bottom: 0.5rem;
+        }
+
+        .stat-value {
+            font-size: 1.5rem;
+            font-weight: 700;
+            color: var(--heading-color);
+        }
+
+        .stat-subtitle {
+            font-size: 0.75rem;
+            color: var(--text-muted);
+            margin-top: 0.5rem;
+        }
+
+        .swap-direction {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin: 1.5rem 0;
+        }
+
+        .swap-icon {
+            width: 3rem;
+            height: 3rem;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background-color: #EEF2FF;
+            border-radius: 50%;
+            color: var(--primary-color);
+            cursor: pointer;
+            transition: all 0.3s;
+            border: 1px solid #C7D2FE;
+        }
+
+        .swap-icon:hover {
+            transform: scale(1.1);
+            background-color: var(--primary-color);
+            color: white;
+        }
+
+        @media (max-width: 768px) {
+            .header-content {
+                flex-direction: column;
+                gap: 1rem;
+                align-items: flex-start;
+            }
+
+            .tab-navigation {
+                overflow-x: auto;
+                white-space: nowrap;
+                padding-bottom: 0.5rem;
+            }
+
+            .button-group {
+                flex-direction: column;
+            }
+
+            .stats-container {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <div class="container header-content">
+            <div class="logo">
+                <i class="fas fa-exchange-alt logo-icon"></i>
+                <span>WXMR Bridge</span>
+            </div>
+            <button id="connect-wallet-btn" class="connect-wallet">
+                <i class="fas fa-wallet"></i> Connect Wallet
+            </button>
+            <div id="wallet-info" style="display: none;" class="connected-wallet">
+                <i class="fas fa-user-circle"></i>
+                <div>
+                    <div class="wallet-address" id="wallet-address">0x1234...5678</div>
+                    <div class="balance-info">
+                        Balance: <span id="wxmr-balance">0.00</span> WXMR
+                    </div>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <div class="container">
+        <div class="tab-navigation">
+            <button class="tab-button active" data-tab="swap">Swap</button>
+            <button class="tab-button" data-tab="liquidity">Liquidity</button>
+            <button class="tab-button" data-tab="transactions">My Transactions</button>
+            <button class="tab-button" data-tab="stats">Stats</button>
+        </div>
+
+        <!-- Swap Tab -->
+        <div id="swap-tab" class="tab-content active">
+            <div class="card">
+                <div class="card-header">
+                    <h2 class="card-title">Swap XMR ⟷ WXMR</h2>
+                    <p class="card-subtitle">Atomic swaps between Monero and Wrapped Monero</p>
+                </div>
+
+                <div class="tabs-secondary">
+                    <div class="tab-secondary active" data-tab-secondary="xmr-to-wxmr">XMR to WXMR</div>
+                    <div class="tab-secondary" data-tab-secondary="wxmr-to-xmr">WXMR to XMR</div>
+                </div>
+
+                <!-- XMR to WXMR Form -->
+                <div id="xmr-to-wxmr-pane" class="tab-pane active">
+                    <form id="xmr-to-wxmr-form">
+                        <div class="form-group">
+                            <label class="form-label">Amount to Swap</label>
+                            <div class="input-group">
+                                <input type="number" class="form-control" id="xmr-amount" placeholder="0.00" step="0.0001" min="0.01">
+                                <div class="input-group-append">XMR</div>
+                            </div>
+                        </div>
+
+                        <div class="form-group">
+                            <label class="form-label">Recipient EVM Address</label>
+                            <input type="text" class="form-control" id="evm-address" placeholder="0x...">
+                        </div>
+
+                        <div class="fee-info">
+                            Fixed fee: <span>0.27%</span> • You will receive: <span id="wxmr-amount-after-fee">0.00</span> WXMR
+                        </div>
+
+                        <div class="form-group" style="margin-top: 1.5rem;">
+                            <button type="button" id="xmr-to-wxmr-btn" class="button-primary">
+                                Initiate Swap
+                            </button>
+                        </div>
+                    </form>
+
+                    <div id="xmr-to-wxmr-processing" style="display: none;">
+                        <div class="steps-container">
+                            <div class="step active">
+                                <div class="step-number">1</div>
+                                <div class="step-content">
+                                    <div class="step-title">Send XMR to Time-locked Address</div>
+                                    <div class="step-description">
+                                        Send the exact amount to the address below. The funds will be locked until the swap completes or the timelock expires.
+                                    </div>
+                                    <div class="qr-code-container">
+                                        <div class="qr-code" id="xmr-qr-code">
+                                            <img src="/api/placeholder/200/200" alt="XMR Address QR Code">
+                                        </div>
+                                        <div class="address-display">
+                                            <span id="timelock-address">4BrL51JCc9NGQ71kWhnYoDRffsDZy7m1HUU7MRU4nUMXAHNFBEJhkTZV9HdaL4gfuNBxLPc3BeMkLGaPbF5vWtANQn5aKRjTnB</span>
+                                            <button class="copy-button" id="copy-timelock-address">
+                                                <i class="fas fa-copy"></i>
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="step">
+                                <div class="step-number">2</div>
+                                <div class="step-content">
+                                    <div class="step-title">Wait for Confirmation</div>
+                                    <div class="step-description">
+                                        After your XMR transaction is confirmed, the bridge oracle will validate it.
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="step">
+                                <div class="step-number">3</div>
+                                <div class="step-content">
+                                    <div class="step-title">Receive WXMR</div>
+                                    <div class="step-description">
+                                        WXMR tokens will be minted and sent to your address. Timelock expires in <span class="countdown" id="timelock-countdown">23:59:59</span>
+                                    </div>
+                                    <div class="step-action">
+                                        <button type="button" id="reveal-secret-btn" class="button-secondary" style="display: none;">
+                                            Reveal Secret
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- WXMR to XMR Form -->
+                <div id="wxmr-to-xmr-pane" class="tab-pane">
+                    <form id="wxmr-to-xmr-form">
+                        <div class="form-group">
+                            <label class="form-label">Amount to Swap</label>
+                            <div class="input-group">
+                                <input type="number" class="form-control" id="wxmr-amount" placeholder="0.00" step="0.0001" min="0.01">
+                                <div class="input-group-append">WXMR</div>
+                            </div>
+                        </div>
+
+                        <div class="form-group">
+                            <label class="form-label">Recipient Monero Address</label>
+                            <input type="text" class="form-control" id="xmr-address" placeholder="4BrL51J...">
+                        </div>
+
+                        <div class="fee-info">
+                            Fixed fee: <span>0.27%</span> • You will receive: <span id="xmr-amount-after-fee">0.00</span> XMR
+                        </div>
+
+                        <div class="form-group" style="margin-top: 1.5rem;">
+                            <button type="button" id="wxmr-to-xmr-btn" class="button-primary button-disabled">
+                                Initiate Swap
+                            </button>
+                        </div>
+                    </form>
+
+                    <div id="wxmr-to-xmr-processing" style="display: none;">
+                        <div class="steps-container">
+                            <div class="step active">
+                                <div class="step-number">1</div>
+                                <div class="step-content">
+                                    <div class="step-title">WXMR Tokens Locked</div>
+                                    <div class="step-description">
+                                        Your WXMR tokens have been locked in the bridge contract. Wait for the bridge oracle to process your swap.
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="step">
+                                <div class="step-number">2</div>
+                                <div class="step-content">
+                                    <div class="step-title">XMR Being Sent</div>
+                                    <div class="step-description">
+                                        The bridge oracle is sending XMR to your address. This process is automatic.
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="step">
+                                <div class="step-number">3</div>
+                                <div class="step-content">
+                                    <div class="step-title">Swap Completed</div>
+                                    <div class="step-description">
+                                        XMR has been sent to your address. Timelock expires in <span class="countdown" id="wxmr-timelock-countdown">23:59:59</span>
+                                    </div>
+                                    <div class="step-action">
+                                        <button type="button" id="check-txid-btn" class="button-secondary">
+                                            Check Transaction
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="accordion">
+                <div class="accordion-header">
+                    <div class="accordion-title">How It Works</div>
+                    <div class="accordion-icon">
+                        <i class="fas fa-chevron-down"></i>
+                    </div>
+                </div>
+                <div class="accordion-content">
+                    <div class="accordion-inner">
+                        <p>The WXMR Bridge enables atomic swaps between Monero (XMR) and Wrapped Monero (WXMR) using time-locked addresses.</p>
+                        <h4 style="margin-top: 1rem; margin-bottom: 0.5rem;">XMR to WXMR:</h4>
+                        <ol style="padding-left: 1.5rem;">
+                            <li>You send XMR to a time-locked Monero address.</li>
+                            <li>The bridge oracle verifies your transaction on the Monero blockchain.</li>
+                            <li>WXMR tokens are minted and sent to your EVM address.</li>
+                        </ol>
+                        <h4 style="margin-top: 1rem; margin-bottom: 0.5rem;">WXMR to XMR:</h4>
+                        <ol style="padding-left: 1.5rem;">
+                            <li>You lock WXMR tokens in the bridge contract.</li>
+                            <li>The bridge oracle detects this and sends XMR to your Monero address.</li>
+                            <li>The locked WXMR tokens are burned.</li>
+                        </ol>
+                        <p style="margin-top: 1rem;">All swaps are protected by time-locks. If a swap fails to complete, you can reclaim your funds after the timelock expires (24 hours by default).</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Liquidity Tab -->
+        <div id="liquidity-tab" class="tab-content">
+            <div class="card">
+                <div class="card-header">
+                    <h2 class="card-title">Manage Liquidity</h2>
+                    <p class="card-subtitle">Provide liquidity to earn 0.27% fees from all swaps</p>
+                </div>
+
+                <div class="tabs-secondary">
+                    <div class="tab-secondary active" data-tab-secondary="add-liquidity">Add Liquidity</div>
+                    <div class="tab-secondary" data-tab-secondary="remove-liquidity">Remove Liquidity</div>
+                    <div class="tab-secondary" data-tab-secondary="claim-fees">Claim Fees</div>
+                </div>
+
+                <!-- Add Liquidity Form -->
+                <div id="add-liquidity-pane" class="tab-pane active">
+                    <div class="form-group">
+                        <label class="form-label">Amount to Provide</label>
+                        <div class="input-group">
+                            <input type="number" class="form-control" id="liquidity-amount" placeholder="0.00" step="0.01" min="0.1">
+                            <div class="input-group-append">XMR</div>
+                        </div>
+                        <small style="color: var(--text-muted); display: block; margin-top: 0.5rem;">
+                            Minimum: 0.1 XMR
+                        </small>
+                    </div>
+
+                    <div class="form-group">
+                        <button type="button" id="add-liquidity-btn" class="button-primary">
+                            Add Liquidity
+                        </button>
+                    </div>
+
+                    <div id="add-liquidity-processing" style="display: none;">
+                        <div class="steps-container">
+                            <div class="step active">
+                                <div class="step-number">1</div>
+                                <div class="step-content">
+                                    <div class="step-title">Send XMR to Liquidity Address</div>
+                                    <div class="step-description">
+                                        Send the exact amount to the address below. The funds will be used to provide liquidity.
+                                    </div>
+                                    <div class="qr-code-container">
+                                        <div class="qr-code" id="liquidity-qr-code">
+                                            <img src="/api/placeholder/200/200" alt="Liquidity Address QR Code">
+                                        </div>
+                                        <div class="address-display">
+                                            <span id="liquidity-address">4BrL51JCc9NGQ71kWhnYoDRffsDZy7m1HUU7MRU4nUMXAHNFBEJhkTZV9HdaL4gfuNBxLPc3BeMkLGaPbF5vWtANQn5aKRjTnB</span>
+                                            <button class="copy-button" id="copy-liquidity-address">
+                                                <i class="fas fa-copy"></i>
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="step">
+                                <div class="step-number">2</div>
+                                <div class="step-content">
+                                    <div class="step-title">Wait for Confirmation</div>
+                                    <div class="step-description">
+                                        After your XMR transaction is confirmed, the bridge oracle will validate it.
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="step">
+                                <div class="step-number">3</div>
+                                <div class="step-content">
+                                    <div class="step-title">Receive WXMR Tokens</div>
+                                    <div class="step-description">
+                                        You'll receive WXMR tokens representing your liquidity position.
+                                    </div>
+                                    <div class="step-action">
+                                        <button type="button" id="complete-liquidity-btn" class="button-secondary" style="display: none;">
+                                            Complete Liquidity Addition
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Remove Liquidity Form -->
+                <div id="remove-liquidity-pane" class="tab-pane">
+                    <div class="form-group">
+                        <label class="form-label">Your Liquidity Position</label>
+                        <div style="background-color: var(--light-bg); padding: 1rem; border-radius: 0.5rem; margin-bottom: 1rem;">
+                            <div style="display: flex; justify-content: space-between; margin-bottom: 0.5rem;">
+                                <span>XMR Committed:</span>
+                                <span id="xmr-committed">0.00 XMR</span>
+                            </div>
+                            <div style="display: flex; justify-content: space-between; margin-bottom: 0.5rem;">
+                                <span>WXMR Holdings:</span>
+                                <span id="wxmr-holdings">0.00 WXMR</span>
+                            </div>
+                            <div style="display: flex; justify-content: space-between;">
+                                <span>Accumulated Fees:</span>
+                                <span id="accumulated-fees">0.00 WXMR</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="form-group">
+                        <label class="form-label">Amount to Withdraw</label>
+                        <div class="input-group">
+                            <input type="number" class="form-control" id="withdraw-amount" placeholder="0.00" step="0.01" min="0.1">
+                            <div class="input-group-append">XMR</div>
+                        </div>
+                        <small style="color: var(--text-muted); display: block; margin-top: 0.5rem;">
+                            Minimum Remaining: 0.1 XMR or withdraw all
+                        </small>
+                    </div>
+
+                    <div class="form-group">
+                        <button type="button" id="remove-liquidity-btn" class="button-primary button-disabled">
+                            Remove Liquidity
+                        </button>
+                    </div>
+
+                    <div class="alert alert-warning" style="font-size: 0.875rem;">
+                        <i class="fas fa-info-circle"></i> Liquidity withdrawals have a 24-hour cooldown period.
+                    </div>
+                </div>
+
+                <!-- Claim Fees Form -->
+                <div id="claim-fees-pane" class="tab-pane">
+                    <div class="form-group">
+                        <label class="form-label">Available Fees</label>
+                        <div style="background-color: var(--light-bg); padding: 1rem; border-radius: 0.5rem; margin-bottom: 1rem;">
+                            <div style="display: flex; justify-content: space-between; margin-bottom: 0.5rem;">
+                                <span>Unclaimed Fees:</span>
+                                <span id="unclaimed-fees">0.00 WXMR</span>
+                            </div>
+                            <div style="display: flex; justify-content: space-between;">
+                                <span>Last Fee Distribution:</span>
+                                <span id="last-distribution">Never</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="form-group">
+                        <button type="button" id="claim-fees-btn" class="button-primary button-disabled">
+                            Claim Fees
+                        </button>
+                    </div>
+
+                    <div class="alert alert-warning" style="font-size: 0.875rem;">
+                        <i class="fas fa-info-circle"></i> Fees are distributed proportionally to liquidity providers by the protocol admin.
+                    </div>
+                </div>
+            </div>
+
+            <div class="accordion">
+                <div class="accordion-header">
+                    <div class="accordion-title">Liquidity Provider Info</div>
+                    <div class="accordion-icon">
+                        <i class="fas fa-chevron-down"></i>
+                    </div>
+                </div>
+                <div class="accordion-content">
+                    <div class="accordion-inner">
+                        <p>As a liquidity provider, you commit XMR to the bridge protocol which enables XMR-WXMR swaps for users.</p>
+                        <h4 style="margin-top: 1rem; margin-bottom: 0.5rem;">Benefits:</h4>
+                        <ul style="padding-left: 1.5rem;">
+                            <li>Earn 0.27% fees from all swaps processed by the bridge</li>
+                            <li>Fees are distributed proportionally based on your share of the liquidity pool</li>
+                        </ul>
+                        <h4 style="margin-top: 1rem; margin-bottom: 0.5rem;">Requirements:</h4>
+                        <ul style="padding-left: 1.5rem;">
+                            <li>Minimum liquidity contribution: 0.1 XMR</li>
+                            <li>Maximum 1 active liquidity pool per address</li>
+                            <li>24-hour cooldown period between withdrawals</li>
+                        </ul>
+                        <p style="margin-top: 1rem;">When you provide liquidity, you receive an equivalent amount of WXMR tokens which represent your position. When you withdraw liquidity, these WXMR tokens are burned.</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Transactions Tab -->
+        <div id="transactions-tab" class="tab-content">
+            <div class="card">
+                <div class="card-header">
+                    <h2 class="card-title">My Transactions</h2>
+                    <p class="card-subtitle">View and manage your active and past swaps</p>
+                </div>
+                
+                <div id="no-transactions" style="text-align: center; padding: 2rem;">
+                    <i class="fas fa-inbox" style="font-size: 3rem; color: var(--text-muted); margin-bottom: 1rem; display: block;"></i>
+                    <p>No transactions found. Connect your wallet to view your transaction history.</p>
+                </div>
+
+                <div id="transactions-list" style="display: none;">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Type</th>
+                                <th>Amount</th>
+                                <th>Date</th>
+                                <th>Status</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="transactions-table-body">
+                            <!-- Transactions will be loaded here -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- Stats Tab -->
+        <div id="stats-tab" class="tab-content">
+            <div class="stats-container">
+                <div class="stat-card">
+                    <div class="stat-title">Total XMR in Reserve</div>
+                    <div class="stat-value" id="total-reserve">0.00 XMR</div>
+                    <div class="stat-subtitle">Total XMR backing WXMR tokens</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-title">Total Liquidity</div>
+                    <div class="stat-value" id="total-liquidity">0.00 XMR</div>
+                    <div class="stat-subtitle">Committed by all providers</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-title">Active Providers</div>
+                    <div class="stat-value" id="active-providers">0</div>
+                    <div class="stat-subtitle">Number of liquidity providers</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-title">Daily Mint Limit</div>
+                    <div class="stat-value" id="daily-mint-limit">10.00 XMR</div>
+                    <div class="stat-subtitle">Maximum daily minting limit</div>
+                </div>
+            </div>
+
+            <div class="card">
+                <div class="card-header">
+                    <h2 class="card-title">Protocol Statistics</h2>
+                    <p class="card-subtitle">Key metrics and information about the WXMR Bridge</p>
+                </div>
+                
+                <table>
+                    <tbody>
+                        <tr>
+                            <td>Bridge Fee</td>
+                            <td id="bridge-fee">0.27%</td>
+                        </tr>
+                        <tr>
+                            <td>Accumulated Fees (Undistributed)</td>
+                            <td id="undistributed-fees">0.00 XMR</td>
+                        </tr>
+                        <tr>
+                            <td>Default Timelock Duration</td>
+                            <td id="timelock-duration">24 hours</td>
+                        </tr>
+                        <tr>
+                            <td>Minimum Liquidity Required</td>
+                            <td id="min-liquidity">1.00 XMR</td>
+                        </tr>
+                        <tr>
+                            <td>Daily XMR Minted</td>
+                            <td id="daily-minted">0.00 / 10.00 XMR</td>
+                        </tr>
+                        <tr>
+                            <td>WXMR Token Address</td>
+                            <td id="wxmr-address" style="font-family: monospace; word-break: break-all;">0x1234567890123456789012345678901234567890</td>
+                        </tr>
+                        <tr>
+                            <td>Bridge Contract Address</td>
+                            <td id="bridge-address" style="font-family: monospace; word-break: break-all;">0x0987654321098765432109876543210987654321</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- Swap Details Modal -->
+    <div class="swap-details-modal" id="swap-details-modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 class="modal-title">Swap Details</h3>
+                <button class="close-modal" id="close-modal">&times;</button>
+            </div>
+            <div id="swap-details-content">
+                <div class="detail-row">
+                    <div class="detail-label">Swap ID</div>
+                    <div class="detail-value" id="detail-swap-id">0x1234...5678</div>
+                </div>
+                <div class="detail-row">
+                    <div class="detail-label">Type</div>
+                    <div class="detail-value" id="detail-swap-type">XMR → WXMR</div>
+                </div>
+                <div class="detail-row">
+                    <div class="detail-label">Amount</div>
+                    <div class="detail-value" id="detail-amount">1.00 XMR</div>
+                </div>
+                <div class="detail-row">
+                    <div class="detail-label">Recipient</div>
+                    <div class="detail-value" id="detail-recipient">0x1234...5678</div>
+                </div>
+                <div class="detail-row">
+                    <div class="detail-label">Status</div>
+                    <div class="detail-value" id="detail-status">
+                        <span class="status-badge status-pending">Pending</span>
+                    </div>
+                </div>
+                <div class="detail-row">
+                    <div class="detail-label">Created</div>
+                    <div class="detail-value" id="detail-timestamp">April 3, 2025 10:30 AM</div>
+                </div>
+                <div class="detail-row">
+                    <div class="detail-label">Timelock Expiry</div>
+                    <div class="detail-value" id="detail-expiry">April 4, 2025 10:30 AM</div>
+                </div>
+                <div class="detail-row" id="detail-xmr-address-row" style="display: none;">
+                    <div class="detail-label">XMR Address</div>
+                    <div class="detail-value" id="detail-xmr-address">4BrL51J...</div>
+                </div>
+                <div class="detail-row" id="detail-timelock-id-row">
+                    <div class="detail-label">Timelock ID</div>
+                    <div class="detail-value" id="detail-timelock-id">0x1234...5678</div>
+                </div>
+            </div>
+            
+            <div class="secret-input-container" id="secret-input-container">
+                <div class="form-group">
+                    <label class="form-label">Enter Secret to Complete Swap</label>
+                    <input type="text" class="form-control" id="secret-input" placeholder="0x...">
+                </div>
+                <div class="form-group">
+                    <button type="button" id="submit-secret-btn" class="button-primary">
+                        Submit Secret
+                    </button>
+                </div>
+            </div>
+            
+            <div class="form-group" id="swap-action-buttons" style="margin-top: 1.5rem;">
+                <div class="button-group">
+                    <button type="button" id="complete-swap-btn" class="button-primary">
+                        Complete Swap
+                    </button>
+                    <button type="button" id="refund-swap-btn" class="button-secondary" style="display: none;">
+                        Request Refund
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // DOM Elements
+        const connectWalletBtn = document.getElementById('connect-wallet-btn');
+        const walletInfo = document.getElementById('wallet-info');
+        const walletAddress = document.getElementById('wallet-address');
+        const wxmrBalance = document.getElementById('wxmr-balance');
+        
+        // Tab Navigation
+        const tabButtons = document.querySelectorAll('.tab-button');
+        const tabContents = document.querySelectorAll('.tab-content');
+        
+        // Secondary Tabs
+        const secondaryTabs = document.querySelectorAll('.tab-secondary');
+        const secondaryPanes = document.querySelectorAll('.tab-pane');
+        
+        // XMR to WXMR Form
+        const xmrToWxmrForm = document.getElementById('xmr-to-wxmr-form');
+        const xmrToWxmrBtn = document.getElementById('xmr-to-wxmr-btn');
+        const xmrToWxmrProcessing = document.getElementById('xmr-to-wxmr-processing');
+        const xmrAmount = document.getElementById('xmr-amount');
+        const wxmrAmountAfterFee = document.getElementById('wxmr-amount-after-fee');
+        
+        // WXMR to XMR Form
+        const wxmrToXmrForm = document.getElementById('wxmr-to-xmr-form');
+        const wxmrToXmrBtn = document.getElementById('wxmr-to-xmr-btn');
+        const wxmrToXmrProcessing = document.getElementById('wxmr-to-xmr-processing');
+        const wxmrAmount = document.getElementById('wxmr-amount');
+        const xmrAmountAfterFee = document.getElementById('xmr-amount-after-fee');
+        
+        // Accordion
+        const accordionHeaders = document.querySelectorAll('.accordion-header');
+        
+        // Modal
+        const swapDetailsModal = document.getElementById('swap-details-modal');
+        const closeModal = document.getElementById('close-modal');
+        
+        // Connect wallet functionality
+        connectWalletBtn.addEventListener('click', async () => {
+            try {
+                if (window.ethereum) {
+                    // Request account access
+                    const accounts = await window.ethereum.request({ method: 'eth_requestAccounts' });
+                    handleAccountsChanged(accounts);
+                    
+                    // Listen for account changes
+                    window.ethereum.on('accountsChanged', handleAccountsChanged);
+                } else {
+                    alert('Please install MetaMask or another Ethereum wallet to use this dApp.');
+                }
+            } catch (error) {
+                console.error('Error connecting wallet:', error);
+                alert('Failed to connect wallet. Please try again.');
+            }
+        });
+        
+        function handleAccountsChanged(accounts) {
+            if (accounts.length === 0) {
+                // No accounts authorized
+                connectWalletBtn.style.display = 'block';
+                walletInfo.style.display = 'none';
+            } else {
+                // Account connected
+                const account = accounts[0];
+                connectWalletBtn.style.display = 'none';
+                walletInfo.style.display = 'block';
+                walletAddress.textContent = `${account.slice(0, 6)}...${account.slice(-4)}`;
+                
+                // Get WXMR balance (mock function for demo)
+                getWXMRBalance(account);
+                
+                // Load user transactions
+                loadUserTransactions(account);
+                
+                // Load liquidity info
+                loadLiquidityInfo(account);
+            }
+        }
+        
+        // Mock function to get WXMR balance
+        function getWXMRBalance(account) {
+            // This would be replaced with actual contract call
+            setTimeout(() => {
+                wxmrBalance.textContent = '10.00';
+            }, 1000);
+        }
+        
+        // Mock function to load user transactions
+        function loadUserTransactions(account) {
+            const noTransactions = document.getElementById('no-transactions');
+            const transactionsList = document.getElementById('transactions-list');
+            const transactionsTableBody = document.getElementById('transactions-table-body');
+            
+            // For demo purposes, show some sample transactions
+            setTimeout(() => {
+                noTransactions.style.display = 'none';
+                transactionsList.style.display = 'block';
+                
+                // Clear existing transactions
+                transactionsTableBody.innerHTML = '';
+                
+                // Add sample transactions
+                const sampleTransactions = [
+                    {
+                        type: 'XMR → WXMR',
+                        amount: '2.50 XMR',
+                        date: 'April 2, 2025',
+                        status: 'completed',
+                        id: '0x1234abcd...'
+                    },
+                    {
+                        type: 'WXMR → XMR',
+                        amount: '1.00 WXMR',
+                        date: 'April 1, 2025',
+                        status: 'pending',
+                        id: '0x5678efgh...'
+                    },
+                    {
+                        type: 'Add Liquidity',
+                        amount: '5.00 XMR',
+                        date: 'March 30, 2025',
+                        status: 'completed',
+                        id: '0x90abcdef...'
+                    }
+                ];
+                
+                sampleTransactions.forEach(tx => {
+                    const row = document.createElement('tr');
+                    
+                    const typeCell = document.createElement('td');
+                    typeCell.textContent = tx.type;
+                    
+                    const amountCell = document.createElement('td');
+                    amountCell.textContent = tx.amount;
+                    
+                    const dateCell = document.createElement('td');
+                    dateCell.textContent = tx.date;
+                    
+                    const statusCell = document.createElement('td');
+                    const statusBadge = document.createElement('span');
+                    statusBadge.className = `status-badge status-${tx.status}`;
+                    statusBadge.textContent = tx.status.charAt(0).toUpperCase() + tx.status.slice(1);
+                    statusCell.appendChild(statusBadge);
+                    
+                    const actionsCell = document.createElement('td');
+                    const viewButton = document.createElement('button');
+                    viewButton.className = 'button-secondary';
+                    viewButton.style.padding = '0.5rem 0.75rem';
+                    viewButton.style.width = 'auto';
+                    viewButton.innerHTML = '<i class="fas fa-eye"></i> View';
+                    viewButton.onclick = () => openSwapDetails(tx.id);
+                    actionsCell.appendChild(viewButton);
+                    
+                    row.append(typeCell, amountCell, dateCell, statusCell, actionsCell);
+                    transactionsTableBody.appendChild(row);
+                });
+            }, 1000);
+        }
+        
+        // Mock function to load liquidity info
+        function loadLiquidityInfo(account) {
+            setTimeout(() => {
+                document.getElementById('xmr-committed').textContent = '5.00 XMR';
+                document.getElementById('wxmr-holdings').textContent = '5.00 WXMR';
+                document.getElementById('accumulated-fees').textContent = '0.02 WXMR';
+                document.getElementById('unclaimed-fees').textContent = '0.02 WXMR';
+                document.getElementById('last-distribution').textContent = 'April 1, 2025';
+                
+                // Enable the remove liquidity button
+                document.getElementById('remove-liquidity-btn').classList.remove('button-disabled');
+                
+                // Enable the claim fees button
+                document.getElementById('claim-fees-btn').classList.remove('button-disabled');
+            }, 1000);
+        }
+        
+        // Tab functionality
+        tabButtons.forEach(button => {
+            button.addEventListener('click', () => {
+                // Remove active class from all tabs
+                tabButtons.forEach(btn => btn.classList.remove('active'));
+                tabContents.forEach(content => content.classList.remove('active'));
+                
+                // Add active class to clicked tab and corresponding content
+                button.classList.add('active');
+                document.getElementById(`${button.dataset.tab}-tab`).classList.add('active');
+            });
+        });
+        
+        // Secondary tabs functionality
+        secondaryTabs.forEach(tab => {
+            tab.addEventListener('click', () => {
+                // Get parent container
+                const parentContainer = tab.closest('.card');
+                
+                // Remove active class from all tabs in this container
+                parentContainer.querySelectorAll('.tab-secondary').forEach(t => t.classList.remove('active'));
+                parentContainer.querySelectorAll('.tab-pane').forEach(p => p.classList.remove('active'));
+                
+                // Add active class to clicked tab and corresponding pane
+                tab.classList.add('active');
+                document.getElementById(`${tab.dataset.tabSecondary}-pane`).classList.add('active');
+            });
+        });
+        
+        // Accordion functionality
+        accordionHeaders.forEach(header => {
+            header.addEventListener('click', () => {
+                const accordion = header.parentElement;
+                accordion.classList.toggle('active');
+            });
+        });
+        
+        // XMR amount input handler
+        xmrAmount.addEventListener('input', () => {
+            const amount = parseFloat(xmrAmount.value) || 0;
+            const fee = amount * 0.0027; // 0.27%
+            const finalAmount = amount - fee;
+            wxmrAmountAfterFee.textContent = finalAmount.toFixed(4);
+        });
+        
+        // WXMR amount input handler
+        wxmrAmount.addEventListener('input', () => {
+            const amount = parseFloat(wxmrAmount.value) || 0;
+            const fee = amount * 0.0027; // 0.27%
+            const finalAmount = amount - fee;
+            xmrAmountAfterFee.textContent = finalAmount.toFixed(4);
+        });
+        
+        // Initiate XMR to WXMR swap
+        xmrToWxmrBtn.addEventListener('click', () => {
+            const amount = parseFloat(xmrAmount.value);
+            const recipient = document.getElementById('evm-address').value;
+            
+            if (!amount || amount <= 0) {
+                alert('Please enter a valid amount');
+                return;
+            }
+            
+            if (!recipient) {
+                alert('Please enter a recipient address');
+                return;
+            }
+            
+            // Hide form and show processing UI
+            xmrToWxmrForm.style.display = 'none';
+            xmrToWxmrProcessing.style.display = 'block';
+            
+            // In a real implementation, this would call the contract
+            // For demo, just simulate a countdown
+            const timelockCountdown = document.getElementById('timelock-countdown');
+            let hours = 23;
+            let minutes = 59;
+            let seconds = 59;
+            
+            const countdownInterval = setInterval(() => {
+                seconds--;
+                if (seconds < 0) {
+                    seconds = 59;
+                    minutes--;
+                    if (minutes < 0) {
+                        minutes = 59;
+                        hours--;
+                        if (hours < 0) {
+                            clearInterval(countdownInterval);
+                            // Show refund button
+                            document.getElementById('reveal-secret-btn').style.display = 'block';
+                            return;
+                        }
+                    }
+                }
+                
+                timelockCountdown.textContent = `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+            }, 1000);
+        });
+        
+        // Enable WXMR to XMR swap button if wallet is connected
+        document.addEventListener('DOMContentLoaded', () => {
+            // Load protocol stats (mock for demo)
+            document.getElementById('total-reserve').textContent = '150.25 XMR';
+            document.getElementById('total-liquidity').textContent = '120.50 XMR';
+            document.getElementById('active-providers').textContent = '12';
+            document.getElementById('daily-mint-limit').textContent = '10.00 XMR';
+            
+            document.getElementById('bridge-fee').textContent = '0.27%';
+            document.getElementById('undistributed-fees').textContent = '0.75 XMR';
+            document.getElementById('timelock-duration').textContent = '24 hours';
+            document.getElementById('min-liquidity').textContent = '1.00 XMR';
+            document.getElementById('daily-minted').textContent = '3.25 / 10.00 XMR';
+            
+            // Simulating wallet connection status check
+            setTimeout(() => {
+                if (walletInfo.style.display !== 'none') {
+                    wxmrToXmrBtn.classList.remove('button-disabled');
+                }
+            }, 1000);
+        });
+        
+                    // Modal functionality
+        function openSwapDetails(swapId) {
+            // In a real implementation, this would fetch swap details from the contract
+            // For demo, just populate with sample data
+            document.getElementById('detail-swap-id').textContent = swapId;
+            document.getElementById('detail-swap-type').textContent = 'XMR → WXMR';
+            document.getElementById('detail-amount').textContent = '2.50 XMR';
+            document.getElementById('detail-recipient').textContent = '0x1234...5678';
+            
+            const statusElement = document.getElementById('detail-status');
+            statusElement.innerHTML = '<span class="status-badge status-pending">Pending</span>';
+            
+            document.getElementById('detail-timestamp').textContent = 'April 3, 2025 10:30 AM';
+            document.getElementById('detail-expiry').textContent = 'April 4, 2025 10:30 AM';
+            document.getElementById('detail-timelock-id').textContent = '0xabcd...1234';
+            
+            // For WXMR to XMR swaps, show XMR address
+            const xmrAddressRow = document.getElementById('detail-xmr-address-row');
+            if (Math.random() > 0.5) {
+                xmrAddressRow.style.display = 'flex';
+                document.getElementById('detail-xmr-address').textContent = '4BrL51J...';
+            } else {
+                xmrAddressRow.style.display = 'none';
+            }
+            
+            // Show different buttons based on swap status
+            const completeSwapBtn = document.getElementById('complete-swap-btn');
+            const refundSwapBtn = document.getElementById('refund-swap-btn');
+            
+            if (Math.random() > 0.7) {
+                // Show refund button for expired swaps
+                completeSwapBtn.style.display = 'none';
+                refundSwapBtn.style.display = 'block';
+            } else {
+                completeSwapBtn.style.display = 'block';
+                refundSwapBtn.style.display = 'none';
+            }
+            
+            // Show the modal
+            swapDetailsModal.style.display = 'flex';
+        }
+        
+        // Close modal when clicking the X
+        closeModal.addEventListener('click', () => {
+            swapDetailsModal.style.display = 'none';
+        });
+        
+        // Close modal when clicking outside the content
+        swapDetailsModal.addEventListener('click', (event) => {
+            if (event.target === swapDetailsModal) {
+                swapDetailsModal.style.display = 'none';
+            }
+        });
+        
+        // Complete swap button
+        document.getElementById('complete-swap-btn').addEventListener('click', () => {
+            const secretInputContainer = document.getElementById('secret-input-container');
+            const swapActionButtons = document.getElementById('swap-action-buttons');
+            
+            secretInputContainer.style.display = 'block';
+            swapActionButtons.style.display = 'none';
+        });
+        
+        // Submit secret button
+        document.getElementById('submit-secret-btn').addEventListener('click', () => {
+            const secretInput = document.getElementById('secret-input');
+            const secret = secretInput.value.trim();
+            
+            if (!secret) {
+                alert('Please enter the secret hash');
+                return;
+            }
+            
+            // In a real implementation, this would call the contract to complete the swap
+            // For demo, just show success message and update status
+            const statusElement = document.getElementById('detail-status');
+            statusElement.innerHTML = '<span class="status-badge status-completed">Completed</span>';
+            
+            const secretInputContainer = document.getElementById('secret-input-container');
+            secretInputContainer.style.display = 'none';
+            
+            // Show success message
+            alert('Swap completed successfully!');
+            
+            // Close modal after a delay
+            setTimeout(() => {
+                swapDetailsModal.style.display = 'none';
+            }, 2000);
+        });
+        
+        // Refund swap button
+        document.getElementById('refund-swap-btn').addEventListener('click', () => {
+            // In a real implementation, this would call the contract to refund the swap
+            // For demo, just show success message and update status
+            const statusElement = document.getElementById('detail-status');
+            statusElement.innerHTML = '<span class="status-badge status-refunded">Refunded</span>';
+            
+            // Show success message
+            alert('Refund initiated successfully! Funds will be returned to your wallet.');
+            
+            // Close modal after a delay
+            setTimeout(() => {
+                swapDetailsModal.style.display = 'none';
+            }, 2000);
+        });
+        
+        // WXMR to XMR swap button
+        wxmrToXmrBtn.addEventListener('click', () => {
+            const amount = parseFloat(wxmrAmount.value);
+            const xmrAddress = document.getElementById('xmr-address').value;
+            
+            if (!amount || amount <= 0) {
+                alert('Please enter a valid amount');
+                return;
+            }
+            
+            if (!xmrAddress) {
+                alert('Please enter a Monero address');
+                return;
+            }
+            
+            // In a real implementation, this would call the contract
+            // For demo, just hide form and show processing UI
+            wxmrToXmrForm.style.display = 'none';
+            wxmrToXmrProcessing.style.display = 'block';
+            
+            // Simulate a countdown
+            const wxmrTimelockCountdown = document.getElementById('wxmr-timelock-countdown');
+            let hours = 23;
+            let minutes = 59;
+            let seconds = 59;
+            
+            const countdownInterval = setInterval(() => {
+                seconds--;
+                if (seconds < 0) {
+                    seconds = 59;
+                    minutes--;
+                    if (minutes < 0) {
+                        minutes = 59;
+                        hours--;
+                        if (hours < 0) {
+                            clearInterval(countdownInterval);
+                            return;
+                        }
+                    }
+                }
+                
+                wxmrTimelockCountdown.textContent = `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+            }, 1000);
+        });
+        
+        // Add liquidity button
+        document.getElementById('add-liquidity-btn').addEventListener('click', () => {
+            const amount = parseFloat(document.getElementById('liquidity-amount').value);
+            
+            if (!amount || amount < 0.1) {
+                alert('Please enter a valid amount (minimum 0.1 XMR)');
+                return;
+            }
+            
+            // In a real implementation, this would call the contract
+            // For demo, just hide form and show processing UI
+            document.getElementById('add-liquidity-pane').querySelector('form').style.display = 'none';
+            document.getElementById('add-liquidity-processing').style.display = 'block';
+        });
+        
+        // Remove liquidity button
+        document.getElementById('remove-liquidity-btn').addEventListener('click', () => {
+            const amount = parseFloat(document.getElementById('withdraw-amount').value);
+            
+            if (!amount || amount <= 0) {
+                alert('Please enter a valid amount');
+                return;
+            }
+            
+            // Check if user has sufficient liquidity
+            const committedStr = document.getElementById('xmr-committed').textContent;
+            const committed = parseFloat(committedStr.split(' ')[0]);
+            
+            if (amount > committed) {
+                alert('Insufficient liquidity. You cannot withdraw more than your committed amount.');
+                return;
+            }
+            
+            // In a real implementation, this would call the contract
+            // For demo, just show success message
+            alert('Liquidity removal initiated! You will receive your XMR shortly.');
+            
+            // Update UI to reflect the change
+            document.getElementById('xmr-committed').textContent = `${(committed - amount).toFixed(2)} XMR`;
+            document.getElementById('wxmr-holdings').textContent = `${(committed - amount).toFixed(2)} WXMR`;
+            document.getElementById('withdraw-amount').value = '';
+        });
+        
+        // Claim fees button
+        document.getElementById('claim-fees-btn').addEventListener('click', () => {
+            // In a real implementation, this would call the contract
+            // For demo, just show success message
+            alert('Fees claimed successfully! You will receive your WXMR tokens shortly.');
+            
+            // Update UI to reflect the change
+            document.getElementById('unclaimed-fees').textContent = '0.00 WXMR';
+            document.getElementById('accumulated-fees').textContent = '0.00 WXMR';
+        });
+        
+        // Copy button functionality
+        document.getElementById('copy-timelock-address').addEventListener('click', () => {
+            const text = document.getElementById('timelock-address').textContent;
+            navigator.clipboard.writeText(text).then(() => {
+                alert('Address copied to clipboard!');
+            });
+        });
+        
+        document.getElementById('copy-liquidity-address').addEventListener('click', () => {
+            const text = document.getElementById('liquidity-address').textContent;
+            navigator.clipboard.writeText(text).then(() => {
+                alert('Address copied to clipboard!');
+            });
+        });
+        
+        // Initialize Web3 (for Ethereum interaction)
+        async function initWeb3() {
+            if (window.ethereum) {
+                window.web3 = new Web3(window.ethereum);
+                try {
+                    // Request account access if needed
+                    await window.ethereum.enable();
+                    console.log('Web3 initialized with Ethereum provider');
+                    
+                    // Check if already connected
+                    const accounts = await web3.eth.getAccounts();
+                    if (accounts.length > 0) {
+                        handleAccountsChanged(accounts);
+                    }
+                } catch (error) {
+                    console.error('User denied account access');
+                }
+            } else if (window.web3) {
+                window.web3 = new Web3(window.web3.currentProvider);
+                console.log('Web3 initialized with existing provider');
+                
+                // Check if already connected
+                const accounts = await web3.eth.getAccounts();
+                if (accounts.length > 0) {
+                    handleAccountsChanged(accounts);
+                }
+            } else {
+                console.log('No Ethereum browser extension detected');
+            }
+        }
+        
+        // Initialize app
+        document.addEventListener('DOMContentLoaded', () => {
+            initWeb3();
+        });
+    </script>
