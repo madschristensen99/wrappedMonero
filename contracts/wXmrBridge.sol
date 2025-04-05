@@ -501,32 +501,7 @@ contract WXMRBridge is AccessControl, ReentrancyGuard {
         return swapId;
     }
     
-    /**
-     * @dev Complete an EVM->XMR swap by revealing the secret
-     * @param swapId The ID of the swap
-     * @param secret The secret that unlocks the time-locked Monero address
-     */
-    function completeEvmToXmrSwap(bytes32 swapId, bytes32 secret) 
-        external 
-        nonReentrant
-        initialized
-        validSwap(swapId)
-    {
-        AtomicSwap storage swap = pendingSwaps[swapId];
-        require(!swap.isXmrToEvm, "Not an EVM to XMR swap");
-        
-        // Verify the secret matches the hash
-        require(keccak256(abi.encodePacked(secret)) == swap.hashLock, "Invalid secret");
-        
-        // Verify the swap hasn't expired
-        require(block.timestamp < swap.timelock, "Swap has expired");
-        
-        // Update state
-        swap.state = SwapState.COMPLETED;
-        
-        emit SwapCompletedToXMR(swapId, secret);
-    }
-    
+
     /**
      * @dev Refund a swap after the timelock has expired
      * @param swapId The ID of the swap to refund
