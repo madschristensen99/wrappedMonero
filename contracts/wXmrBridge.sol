@@ -1,9 +1,8 @@
 // SPDX-License-Identifier: LGPLv3
-pragma solidity ^0.8.19;
+pragma solidity ^0.8.26;
 
 import "@openzeppelin/contracts/access/AccessControl.sol";
 import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
-import "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
 import "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
 
 interface IWXMR {
@@ -14,15 +13,13 @@ interface IWXMR {
 
 /**
  * @title WXMRBridge
- * @dev Bridge contract to handle atomic swaps between WXMR and XMR using time-locked addresses
- * Simplified version with fixed fee and streamlined role structure
+ * @dev Bridge contract to handle atomic swaps between WXMR and XMR using hash time-locked contracts
+ * Eliminates trusted signers and facilitators by using cryptographic hash preimages
  */
 contract WXMRBridge is AccessControl, ReentrancyGuard {
-    using ECDSA for bytes32;
     using EnumerableSet for EnumerableSet.AddressSet;
     
     bytes32 public constant ADMIN_ROLE = keccak256("ADMIN_ROLE");
-    bytes32 public constant SWAP_FACILITATOR_ROLE = keccak256("SWAP_FACILITATOR_ROLE");
     
     IWXMR public wxmrToken;
     bool public tokenInitialized = false;
@@ -50,7 +47,7 @@ contract WXMRBridge is AccessControl, ReentrancyGuard {
     uint256 public maxTimelockDuration = 7 days;
     
     // Mapping from swap IDs to pending swaps
-    mapping(bytes32 => TimeLockSwap) public pendingSwaps;
+    mapping(bytes32 => AtomicSwap) public pendingSwaps;
     
     // Stores liquidity provider information
     mapping(address => LiquidityProvider) public liquidityProviders;
@@ -65,23 +62,25 @@ contract WXMRBridge is AccessControl, ReentrancyGuard {
     // Cooldown period for liquidity withdrawals
     uint256 public liquidityWithdrawalCooldown = 1 days;
     
-    // Authorized signers for verification
-    mapping(address => bool) public authorizedSigners;
+    // Swap states
+    enum SwapState {
+        INVALID,
+        INITIATED,
+        CONFIRMED,
+        COMPLETED,
+        REFUNDED
+    }
     
-    struct TimeLockSwap {
-        address recipient;          // The EVM address receiving WXMR or that sent WXMR
+    struct AtomicSwap {
+        address initiator;          // The party that initiated the swap
+        address recipient;          // The recipient of the WXMR tokens or refund
         uint256 amount;             // Amount of XMR/WXMR being swapped
         bool isXmrToEvm;            // Direction of the swap
-        uint256 timestamp;          // When the swap was initiated
-        bool completed;             // Whether the swap has been completed
-        bool refunded;              // Whether the swap has been refunded
-        bytes32 timelockId;         // Identifier for the time-locked address
-        bytes32 secretHash;         // Hash of the secret needed to unlock funds
-        uint256 timelockExpiryTime; // When the time-lock expires
+        uint256 initTimestamp;      // When the swap was initiated
+        SwapState state;            // Current state of the swap
+        bytes32 hashLock;           // Hash of the secret needed to unlock funds
+        uint256 timelock;           // When the timelock expires
         string xmrAddress;          // Monero address (for EVM->XMR)
-        bytes32 timelockProof;      // Proof that the time-lock address was properly set up
-        address initiator;          // Address that initiated this swap
-        bytes signature;            // Signature for verification
         uint256 minAmountOut;       // Minimum amount out (slippage protection)
     }
     
@@ -99,9 +98,13 @@ contract WXMRBridge is AccessControl, ReentrancyGuard {
         bytes32 indexed swapId, 
         address indexed recipient, 
         uint256 amount, 
-        bytes32 timelockId, 
-        uint256 timelockExpiryTime,
-        address initiator
+        bytes32 hashLock, 
+        uint256 timelock
+    );
+    
+    event SwapConfirmed(
+        bytes32 indexed swapId,
+        address confirmer
     );
     
     event SwapCompletedToEVM(
@@ -116,9 +119,8 @@ contract WXMRBridge is AccessControl, ReentrancyGuard {
         address indexed sender, 
         uint256 amount, 
         string xmrAddress, 
-        bytes32 timelockId, 
-        uint256 timelockExpiryTime,
-        address initiator
+        bytes32 hashLock, 
+        uint256 timelock
     );
     
     event SwapCompletedToXMR(
@@ -150,23 +152,18 @@ contract WXMRBridge is AccessControl, ReentrancyGuard {
     
     event FeesClaimed(address indexed provider, uint256 amount);
     
-    event ExpiredSwapCleaned(bytes32 indexed swapId);
-    
-    event AuthorizedSignerAdded(address indexed signer);
-    event AuthorizedSignerRemoved(address indexed signer);
     event LiquidityParametersUpdated(uint256 newMinLiquidity, uint256 newMaxDailyMint);
     event TimelockDurationUpdated(uint256 newDuration);
     event MaxPoolsPerAddressUpdated(uint256 newMaxPools);
     
     /**
-     * @dev Modifier to check if a swap exists and is not completed or refunded
+     * @dev Modifier to check if a swap exists and is in a valid state
      * @param swapId The ID of the swap
      */
     modifier validSwap(bytes32 swapId) {
-        TimeLockSwap storage swap = pendingSwaps[swapId];
-        require(swap.timestamp > 0, "Swap does not exist");
-        require(!swap.completed, "Swap already completed");
-        require(!swap.refunded, "Swap already refunded");
+        AtomicSwap storage swap = pendingSwaps[swapId];
+        require(swap.initTimestamp > 0, "Swap does not exist");
+        require(swap.state != SwapState.COMPLETED && swap.state != SwapState.REFUNDED, "Swap already completed or refunded");
         _;
     }
     
@@ -181,11 +178,6 @@ contract WXMRBridge is AccessControl, ReentrancyGuard {
     constructor() {
         _grantRole(DEFAULT_ADMIN_ROLE, msg.sender);
         _grantRole(ADMIN_ROLE, msg.sender);
-        _grantRole(SWAP_FACILITATOR_ROLE, msg.sender);
-        
-        // Add the deployer as an authorized signer
-        authorizedSigners[msg.sender] = true;
-        emit AuthorizedSignerAdded(msg.sender);
     }
     
     /**
@@ -200,31 +192,6 @@ contract WXMRBridge is AccessControl, ReentrancyGuard {
         tokenInitialized = true;
         
         emit TokenInitialized(msg.sender, _wxmrAddress);
-    }
-    
-    /**
-     * @dev Add an authorized signer
-     * @param signer The address to add as an authorized signer
-     */
-    function addAuthorizedSigner(address signer) external onlyRole(ADMIN_ROLE) {
-        require(signer != address(0), "Invalid signer address");
-        require(!authorizedSigners[signer], "Signer already authorized");
-        
-        authorizedSigners[signer] = true;
-        
-        emit AuthorizedSignerAdded(signer);
-    }
-    
-    /**
-     * @dev Remove an authorized signer
-     * @param signer The address to remove as an authorized signer
-     */
-    function removeAuthorizedSigner(address signer) external onlyRole(ADMIN_ROLE) {
-        require(authorizedSigners[signer], "Signer not authorized");
-        
-        authorizedSigners[signer] = false;
-        
-        emit AuthorizedSignerRemoved(signer);
     }
     
     /**
@@ -279,29 +246,29 @@ contract WXMRBridge is AccessControl, ReentrancyGuard {
     function distributeFees() external nonReentrant onlyRole(ADMIN_ROLE) initialized {
         require(accumulatedFees > 0, "No fees to distribute");
         require(totalLiquidityCommitted > 0, "No liquidity providers");
-        
+    
         uint256 totalFees = accumulatedFees;
-        // Set accumulated fees to 0 first to prevent reentrancy
-        accumulatedFees = 0;
-        
         uint256 providersRewarded = 0;
-        
+    
         // Distribute fees proportionally to liquidity providers by calculating shares
         for (uint256 i = 0; i < liquidityProviderSet.length(); i++) {
             address provider = liquidityProviderSet.at(i);
             LiquidityProvider storage lp = liquidityProviders[provider];
-            
+        
             if (lp.isActive && lp.xmrCommitted > 0) {
                 // Calculate provider's share of fees based on their proportion of total liquidity
                 uint256 providerShare = (totalFees * lp.xmrCommitted) / totalLiquidityCommitted;
-                
+            
                 if (providerShare > 0) {
                     lp.accumulatedFees += providerShare;
                     providersRewarded++;
                 }
             }
         }
-        
+    
+        // Set accumulated fees to 0 after all operations have completed
+        accumulatedFees = 0;
+    
         emit FeesDistributed(totalFees, providersRewarded);
     }
     
@@ -332,70 +299,28 @@ contract WXMRBridge is AccessControl, ReentrancyGuard {
     }
     
     /**
-     * @dev Clean up an expired swap
-     * @param swapId The ID of the swap to clean up
-     */
-    function cleanExpiredSwap(bytes32 swapId) external onlyRole(ADMIN_ROLE) validSwap(swapId) {
-        TimeLockSwap storage swap = pendingSwaps[swapId];
-        
-        // Check if the timelock has expired
-        require(block.timestamp > swap.timelockExpiryTime, "Swap not expired yet");
-        
-        // Check if this is a liquidity deposit
-        if (keccak256(abi.encodePacked(swap.xmrAddress)) == keccak256(abi.encodePacked("LIQUIDITY"))) {
-            // Reduce pending deposit count
-            LiquidityProvider storage lp = liquidityProviders[swap.recipient];
-            if (lp.pendingDeposits > 0) {
-                lp.pendingDeposits--;
-            }
-        }
-        
-        // Mark as cleaned up (use refunded flag for this purpose)
-        swap.refunded = true;
-        
-        emit ExpiredSwapCleaned(swapId);
-    }
-    
-    /**
-     * @dev Initiate a XMR->EVM swap using a time-locked Monero address
+     * @dev First phase of XMR->EVM swap: Anyone can initiate a swap by providing a hashlock.
+     * This function doesn't require validation since the XMR hasn't been sent yet.
      * @param recipient The recipient of the WXMR tokens
-     * @param amount The amount of XMR being swapped
-     * @param timelockId The identifier for the time-locked Monero address
-     * @param secretHash Hash of the secret used to unlock the time-locked address
-     * @param timelockProof Proof that the time-lock was properly set up
-     * @param timelockExpiry Timestamp when the time-lock expires
-     * @param signature Signature for authentication
+     * @param amount The amount of XMR to be swapped
+     * @param hashLock Hash of the secret that will be used to claim the funds
+     * @param timelock Duration in seconds until the swap expires
      */
     function initiateXmrToEvmSwap(
         address recipient, 
-        uint256 amount, 
-        bytes32 timelockId,
-        bytes32 secretHash,
-        bytes32 timelockProof,
-        uint256 timelockExpiry,
-        bytes calldata signature
+        uint256 amount,
+        bytes32 hashLock,
+        uint256 timelock
     ) 
         external 
-        onlyRole(SWAP_FACILITATOR_ROLE)
+        nonReentrant
         initialized
         returns (bytes32)
     {
         require(amount > 0, "Amount must be greater than zero");
-        require(timelockExpiry > block.timestamp, "Timelock already expired");
-        require(isValidEvmAddress(recipient), "Invalid recipient address");
-        
-        // Create the message hash for signature verification
-        bytes32 messageHash = keccak256(abi.encodePacked(
-            recipient,
-            amount,
-            timelockId,
-            secretHash,
-            timelockExpiry
-        ));
-        
-        // Verify the signature comes from an authorized signer
-        address signer = verifySignature(messageHash, signature);
-        require(authorizedSigners[signer], "Signature not from authorized signer");
+        require(timelock >= minTimelockDuration && timelock <= maxTimelockDuration, "Invalid timelock duration");
+        require(hashLock != bytes32(0), "Invalid hashlock");
+        require(recipient != address(0), "Invalid recipient address");
         
         // Calculate fee and final amount using fixed fee percentage
         uint256 fee = (amount * FEE_PERCENTAGE) / 10000;
@@ -404,53 +329,71 @@ contract WXMRBridge is AccessControl, ReentrancyGuard {
         // Prevent fee accumulation overflow
         require(accumulatedFees + fee <= MAX_ACCUMULATED_FEES, "Fee accumulation limit reached");
         
-        // Accumulate fees for later distribution
-        accumulatedFees += fee;
-        
         bytes32 swapId = keccak256(abi.encodePacked(
             recipient,
             amount,
-            timelockId,
-            secretHash,
+            hashLock,
             block.timestamp
         ));
         
         // Ensure swap doesn't already exist
-        require(pendingSwaps[swapId].timestamp == 0, "Swap already exists");
+        require(pendingSwaps[swapId].initTimestamp == 0, "Swap already exists");
         
-        pendingSwaps[swapId] = TimeLockSwap({
+        uint256 swapTimelock = block.timestamp + timelock;
+        
+        pendingSwaps[swapId] = AtomicSwap({
+            initiator: msg.sender,
             recipient: recipient,
             amount: finalAmount,
             isXmrToEvm: true,
-            timestamp: block.timestamp,
-            completed: false,
-            refunded: false,
-            timelockId: timelockId,
-            secretHash: secretHash,
-            timelockExpiryTime: timelockExpiry,
+            initTimestamp: block.timestamp,
+            state: SwapState.INITIATED,
+            hashLock: hashLock,
+            timelock: swapTimelock,
             xmrAddress: "",
-            timelockProof: timelockProof,
-            initiator: msg.sender,
-            signature: signature,
             minAmountOut: finalAmount // No slippage for this direction
         });
+        
+        // Accumulate fees for later distribution
+        accumulatedFees += fee;
         
         emit SwapInitiatedToEVM(
             swapId, 
             recipient, 
             finalAmount, 
-            timelockId, 
-            timelockExpiry,
-            msg.sender
+            hashLock, 
+            swapTimelock
         );
         
         return swapId;
     }
     
     /**
+     * @dev Confirm that the XMR has been sent to the specified Monero address
+     * This replaces the need for a trusted facilitator
+     * @param swapId The ID of the swap to confirm
+     */
+    function confirmXmrToEvmSwap(bytes32 swapId) 
+        external 
+        nonReentrant
+        initialized
+        validSwap(swapId)
+    {
+        AtomicSwap storage swap = pendingSwaps[swapId];
+        require(swap.isXmrToEvm, "Not an XMR to EVM swap");
+        require(swap.state == SwapState.INITIATED, "Swap not in initiated state");
+        
+        // Anyone can confirm the swap, but typically the recipient would do this
+        // after verifying the XMR transaction on the Monero blockchain
+        swap.state = SwapState.CONFIRMED;
+        
+        emit SwapConfirmed(swapId, msg.sender);
+    }
+    
+    /**
      * @dev Complete a XMR->EVM swap by revealing the secret
      * @param swapId The ID of the swap
-     * @param secret The secret that unlocks the time-locked Monero address
+     * @param secret The secret that unlocks the funds (preimage of hashLock)
      */
     function completeXmrToEvmSwap(bytes32 swapId, bytes32 secret) 
         external 
@@ -458,14 +401,16 @@ contract WXMRBridge is AccessControl, ReentrancyGuard {
         initialized
         validSwap(swapId)
     {
-        TimeLockSwap storage swap = pendingSwaps[swapId];
+        AtomicSwap storage swap = pendingSwaps[swapId];
         require(swap.isXmrToEvm, "Not an XMR to EVM swap");
+        require(swap.state == SwapState.CONFIRMED, "Swap not confirmed");
+        require(msg.sender == swap.recipient, "Only recipient can complete swap");
         
         // Verify the secret matches the hash
-        require(keccak256(abi.encodePacked(secret)) == swap.secretHash, "Invalid secret");
+        require(keccak256(abi.encodePacked(secret)) == swap.hashLock, "Invalid secret");
         
         // Verify the swap hasn't expired
-        require(block.timestamp < swap.timelockExpiryTime, "Swap has expired");
+        require(block.timestamp < swap.timelock, "Swap has expired");
         
         // Reset daily mint limit if needed
         if (block.timestamp - lastResetTime >= 1 days) {
@@ -477,7 +422,7 @@ contract WXMRBridge is AccessControl, ReentrancyGuard {
         require(dailyMinted + swap.amount <= maxDailyMint, "Daily mint limit reached");
         
         // Update state before external calls to prevent reentrancy
-        swap.completed = true;
+        swap.state = SwapState.COMPLETED;
         dailyMinted += swap.amount;
         totalReserve += swap.amount;
         
@@ -491,15 +436,13 @@ contract WXMRBridge is AccessControl, ReentrancyGuard {
      * @dev Initiate a WXMR->XMR swap
      * @param amount The amount of WXMR to swap
      * @param xmrAddress The Monero address to receive the funds
-     * @param timelockId Identifier for the time-locked Monero address
-     * @param secretHash Hash of the secret needed to claim the XMR
+     * @param hashLock Hash of the secret needed to claim the XMR
      * @param minAmountOut Minimum amount to receive after fees (slippage protection)
      */
     function initiateEvmToXmrSwap(
         uint256 amount, 
         string calldata xmrAddress,
-        bytes32 timelockId,
-        bytes32 secretHash,
+        bytes32 hashLock,
         uint256 minAmountOut
     ) 
         external 
@@ -510,6 +453,7 @@ contract WXMRBridge is AccessControl, ReentrancyGuard {
         require(amount > 0, "Amount must be greater than zero");
         require(wxmrToken.balanceOf(msg.sender) >= amount, "Insufficient WXMR balance");
         require(isValidMoneroAddress(xmrAddress), "Invalid Monero address");
+        require(hashLock != bytes32(0), "Invalid hashlock");
         
         // Calculate fee and final amount using fixed fee percentage
         uint256 fee = (amount * FEE_PERCENTAGE) / 10000;
@@ -532,26 +476,21 @@ contract WXMRBridge is AccessControl, ReentrancyGuard {
             msg.sender,
             amount,
             xmrAddress,
-            timelockId,
-            secretHash,
+            hashLock,
             block.timestamp
         ));
         
         // Create the swap record before external calls to prevent reentrancy
-        pendingSwaps[swapId] = TimeLockSwap({
+        pendingSwaps[swapId] = AtomicSwap({
+            initiator: msg.sender,
             recipient: msg.sender,
             amount: finalAmount,
             isXmrToEvm: false,
-            timestamp: block.timestamp,
-            completed: false,
-            refunded: false,
-            timelockId: timelockId,
-            secretHash: secretHash,
-            timelockExpiryTime: timelockExpiry,
+            initTimestamp: block.timestamp,
+            state: SwapState.INITIATED,
+            hashLock: hashLock,
+            timelock: timelockExpiry,
             xmrAddress: xmrAddress,
-            timelockProof: bytes32(0), // Will be set by the operator
-            initiator: msg.sender,
-            signature: new bytes(0),   // No signature yet
             minAmountOut: minAmountOut
         });
         
@@ -570,46 +509,11 @@ contract WXMRBridge is AccessControl, ReentrancyGuard {
             msg.sender, 
             finalAmount, 
             xmrAddress, 
-            timelockId, 
-            timelockExpiry,
-            msg.sender
+            hashLock, 
+            timelockExpiry
         );
         
         return swapId;
-    }
-    
-    /**
-     * @dev Set the timelock proof for an EVM->XMR swap with signature verification
-     * @param swapId The ID of the swap
-     * @param timelockProof Proof that the time-locked Monero address was set up
-     * @param signature Signature for verification
-     */
-    function setTimelockProof(
-        bytes32 swapId, 
-        bytes32 timelockProof, 
-        bytes calldata signature
-    ) 
-        external 
-        onlyRole(SWAP_FACILITATOR_ROLE)
-        initialized
-        validSwap(swapId)
-    {
-        TimeLockSwap storage swap = pendingSwaps[swapId];
-        require(!swap.isXmrToEvm, "Not an EVM to XMR swap");
-        require(swap.timelockProof == bytes32(0), "Timelock proof already set");
-        
-        // Create the message hash for signature verification
-        bytes32 messageHash = keccak256(abi.encodePacked(
-            swapId,
-            timelockProof
-        ));
-        
-        // Verify the signature comes from an authorized signer
-        address signer = verifySignature(messageHash, signature);
-        require(authorizedSigners[signer], "Signature not from authorized signer");
-        
-        swap.timelockProof = timelockProof;
-        swap.signature = signature;
     }
     
     /**
@@ -623,18 +527,17 @@ contract WXMRBridge is AccessControl, ReentrancyGuard {
         initialized
         validSwap(swapId)
     {
-        TimeLockSwap storage swap = pendingSwaps[swapId];
+        AtomicSwap storage swap = pendingSwaps[swapId];
         require(!swap.isXmrToEvm, "Not an EVM to XMR swap");
-        require(swap.timelockProof != bytes32(0), "Timelock proof not set");
         
         // Verify the secret matches the hash
-        require(keccak256(abi.encodePacked(secret)) == swap.secretHash, "Invalid secret");
+        require(keccak256(abi.encodePacked(secret)) == swap.hashLock, "Invalid secret");
         
         // Verify the swap hasn't expired
-        require(block.timestamp < swap.timelockExpiryTime, "Swap has expired");
+        require(block.timestamp < swap.timelock, "Swap has expired");
         
         // Update state
-        swap.completed = true;
+        swap.state = SwapState.COMPLETED;
         
         emit SwapCompletedToXMR(swapId, secret);
     }
@@ -649,19 +552,19 @@ contract WXMRBridge is AccessControl, ReentrancyGuard {
         initialized
         validSwap(swapId)
     {
-        TimeLockSwap storage swap = pendingSwaps[swapId];
+        AtomicSwap storage swap = pendingSwaps[swapId];
         
-        // Only the recipient or the original initiator can refund
+        // Only the initiator or recipient can refund
         require(
             swap.recipient == msg.sender || swap.initiator == msg.sender, 
             "Not authorized to refund"
         );
         
         // Check if the timelock has expired
-        require(block.timestamp > swap.timelockExpiryTime, "Timelock not expired yet");
+        require(block.timestamp > swap.timelock, "Timelock not expired yet");
         
         // Mark as refunded before external calls to prevent reentrancy
-        swap.refunded = true;
+        swap.state = SwapState.REFUNDED;
         
         if (swap.isXmrToEvm) {
             // For XMR->EVM swaps, no action needed on Ethereum side
@@ -676,19 +579,13 @@ contract WXMRBridge is AccessControl, ReentrancyGuard {
     }
     
     /**
-     * @dev Add liquidity to the system (requires proof of XMR deposit)
+     * @dev Add liquidity to the system using hash time-locked contracts
      * @param xmrAmount The amount of XMR committed
-     * @param timelockId Identifier of the time-locked deposit
-     * @param secretHash Hash of the secret used for the time-lock
-     * @param timelockProof Proof that the time-lock was properly set up
-     * @param signature Signature for verification
+     * @param hashLock Hash of the secret used for verification
      */
-    function addLiquidity(
+    function initiateAddLiquidity(
         uint256 xmrAmount,
-        bytes32 timelockId,
-        bytes32 secretHash,
-        bytes32 timelockProof,
-        bytes calldata signature
+        bytes32 hashLock
     ) 
         external 
         nonReentrant
@@ -696,6 +593,7 @@ contract WXMRBridge is AccessControl, ReentrancyGuard {
         returns (bytes32)
     {
         require(xmrAmount >= minLiquidityPerProvider, "Amount below minimum required");
+        require(hashLock != bytes32(0), "Invalid hashlock");
         
         LiquidityProvider storage lp = liquidityProviders[msg.sender];
         
@@ -704,43 +602,27 @@ contract WXMRBridge is AccessControl, ReentrancyGuard {
             require(lp.pendingDeposits < maxPoolsPerAddress, "Too many pending deposits");
         }
         
-        // Create the message hash for signature verification
-        bytes32 messageHash = keccak256(abi.encodePacked(
-            msg.sender,
-            xmrAmount,
-            timelockId,
-            secretHash
-        ));
-        
-        // Verify the signature comes from an authorized signer
-        address signer = verifySignature(messageHash, signature);
-        require(authorizedSigners[signer], "Signature not from authorized signer");
-        
         bytes32 depositId = keccak256(abi.encodePacked(
             "LIQUIDITY", 
             msg.sender, 
             xmrAmount,
-            timelockId,
+            hashLock,
             block.timestamp
         ));
         
         // Create a pseudo-swap for the liquidity deposit
         uint256 timelockExpiry = block.timestamp + defaultTimelockDuration;
         
-        pendingSwaps[depositId] = TimeLockSwap({
+        pendingSwaps[depositId] = AtomicSwap({
+            initiator: msg.sender,
             recipient: msg.sender,
             amount: xmrAmount,
             isXmrToEvm: true, // Treated as an XMR->EVM swap
-            timestamp: block.timestamp,
-            completed: false,
-            refunded: false,
-            timelockId: timelockId,
-            secretHash: secretHash,
-            timelockExpiryTime: timelockExpiry,
+            initTimestamp: block.timestamp,
+            state: SwapState.INITIATED,
+            hashLock: hashLock,
+            timelock: timelockExpiry,
             xmrAddress: "LIQUIDITY", // Mark as liquidity deposit
-            timelockProof: timelockProof,
-            initiator: msg.sender,
-            signature: signature,
             minAmountOut: xmrAmount // No slippage for liquidity
         });
         
@@ -751,9 +633,31 @@ contract WXMRBridge is AccessControl, ReentrancyGuard {
     }
     
     /**
+     * @dev Confirm that XMR has been sent to the liquidity pool
+     * @param depositId The ID of the liquidity deposit
+     */
+    function confirmLiquidityDeposit(bytes32 depositId) 
+        external 
+        nonReentrant
+        initialized
+        validSwap(depositId)
+    {
+        AtomicSwap storage deposit = pendingSwaps[depositId];
+        
+        require(keccak256(abi.encodePacked(deposit.xmrAddress)) == 
+                keccak256(abi.encodePacked("LIQUIDITY")), "Not a liquidity deposit");
+        require(deposit.state == SwapState.INITIATED, "Deposit not in initiated state");
+        
+        // Update deposit state
+        deposit.state = SwapState.CONFIRMED;
+        
+        emit SwapConfirmed(depositId, msg.sender);
+    }
+    
+    /**
      * @dev Complete liquidity addition by revealing the secret
      * @param depositId The ID of the liquidity deposit
-     * @param secret The secret that unlocks the time-locked deposit
+     * @param secret The secret that verifies the XMR deposit
      */
     function completeLiquidityDeposit(bytes32 depositId, bytes32 secret)
         external
@@ -761,17 +665,18 @@ contract WXMRBridge is AccessControl, ReentrancyGuard {
         initialized
         validSwap(depositId)
     {
-        TimeLockSwap storage deposit = pendingSwaps[depositId];
+        AtomicSwap storage deposit = pendingSwaps[depositId];
         
         require(deposit.recipient == msg.sender, "Not the deposit owner");
         require(keccak256(abi.encodePacked(deposit.xmrAddress)) == 
                 keccak256(abi.encodePacked("LIQUIDITY")), "Not a liquidity deposit");
+        require(deposit.state == SwapState.CONFIRMED, "Deposit not confirmed");
         
         // Verify the secret matches the hash
-        require(keccak256(abi.encodePacked(secret)) == deposit.secretHash, "Invalid secret");
+        require(keccak256(abi.encodePacked(secret)) == deposit.hashLock, "Invalid secret");
         
         // Verify the deposit hasn't expired
-        require(block.timestamp < deposit.timelockExpiryTime, "Deposit has expired");
+        require(block.timestamp < deposit.timelock, "Deposit has expired");
         
         address provider = deposit.recipient;
         uint256 xmrAmount = deposit.amount;
@@ -779,7 +684,7 @@ contract WXMRBridge is AccessControl, ReentrancyGuard {
         LiquidityProvider storage lp = liquidityProviders[provider];
         
         // Update state before external calls to prevent reentrancy
-        deposit.completed = true;
+        deposit.state = SwapState.COMPLETED;
         
         if (!lp.isActive) {
             lp.isActive = true;
@@ -870,32 +775,30 @@ contract WXMRBridge is AccessControl, ReentrancyGuard {
         external 
         view 
         returns (
+            address initiator,
             address recipient,
             uint256 amount,
             bool isXmrToEvm,
-            uint256 timestamp,
-            bool completed,
-            bool refunded,
-            bytes32 timelockId,
-            uint256 timelockExpiryTime,
+            uint256 initTimestamp,
+            SwapState state,
+            bytes32 hashLock,
+            uint256 timelock,
             string memory xmrAddress,
-            address initiator,
             uint256 minAmountOut
         ) 
     {
-        TimeLockSwap storage swap = pendingSwaps[swapId];
+        AtomicSwap storage swap = pendingSwaps[swapId];
         
         return (
+            swap.initiator,
             swap.recipient,
             swap.amount,
             swap.isXmrToEvm,
-            swap.timestamp,
-            swap.completed,
-            swap.refunded,
-            swap.timelockId,
-            swap.timelockExpiryTime,
+            swap.initTimestamp,
+            swap.state,
+            swap.hashLock,
+            swap.timelock,
             swap.xmrAddress,
-            swap.initiator,
             swap.minAmountOut
         );
     }
@@ -962,37 +865,17 @@ contract WXMRBridge is AccessControl, ReentrancyGuard {
     }
     
     /**
-     * @dev Verify a signature and return the signer
-     * @param messageHash The message hash that was signed
-     * @param signature The signature to verify
-     * @return The address that signed the message
+     * @dev Verify if a secret matches a given hash lock
+     * @param hashLock The hash to verify against
+     * @param secret The secret to check
+     * @return Whether the secret matches the hash lock
      */
-    function verifySignature(bytes32 messageHash, bytes memory signature) 
-        public 
-        pure 
-        returns (address) 
-    {
-        // Prefix the hash according to EIP-191 to create an Ethereum signed message
-        bytes32 ethSignedMessageHash = keccak256(
-            abi.encodePacked("\x19Ethereum Signed Message:\n32", messageHash)
-        );
-        
-        // Use OpenZeppelin's ECDSA library to safely recover the signer
-        return ECDSA.recover(ethSignedMessageHash, signature);
-    }
-    
-    /**
-     * @dev Verify that a secret matches a given hash
-     * @param secretHash The hash to compare against
-     * @param secret The secret to verify
-     * @return Whether the secret matches the hash
-     */
-    function verifySecret(bytes32 secretHash, bytes32 secret) 
+    function verifySecret(bytes32 hashLock, bytes32 secret) 
         public 
         pure 
         returns (bool) 
     {
-        return keccak256(abi.encodePacked(secret)) == secretHash;
+        return keccak256(abi.encodePacked(secret)) == hashLock;
     }
     
     /**
@@ -1053,19 +936,5 @@ contract WXMRBridge is AccessControl, ReentrancyGuard {
         }
         
         return true;
-    }
-    
-    /**
-     * @dev Validate an EVM/Ethereum address
-     * @param addr The address to validate
-     * @return Whether the address is valid
-     */
-    function isValidEvmAddress(address addr) 
-        public 
-        pure 
-        returns (bool) 
-    {
-        // Basic validation: ensure the address is not zero
-        return addr != address(0);
     }
 }
