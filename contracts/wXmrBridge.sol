@@ -395,41 +395,26 @@ contract WXMRBridge is AccessControl, ReentrancyGuard {
      * @param swapId The ID of the swap
      * @param secret The secret that unlocks the funds (preimage of hashLock)
      */
-    function completeXmrToEvmSwap(bytes32 swapId, bytes32 secret) 
+    function completeEvmToXmrSwap(bytes32 swapId, bytes32 secret) 
         external 
         nonReentrant
         initialized
         validSwap(swapId)
     {
         AtomicSwap storage swap = pendingSwaps[swapId];
-        require(swap.isXmrToEvm, "Not an XMR to EVM swap");
-        require(swap.state == SwapState.CONFIRMED, "Swap not confirmed");
-        require(msg.sender == swap.recipient, "Only recipient can complete swap");
-        
+        require(!swap.isXmrToEvm, "Not an EVM to XMR swap");
+        require(swap.state == SwapState.INITIATED, "Swap not in initiated state");
+    
         // Verify the secret matches the hash
         require(keccak256(abi.encodePacked(secret)) == swap.hashLock, "Invalid secret");
-        
+    
         // Verify the swap hasn't expired
         require(block.timestamp < swap.timelock, "Swap has expired");
-        
-        // Reset daily mint limit if needed
-        if (block.timestamp - lastResetTime >= 1 days) {
-            dailyMinted = 0;
-            lastResetTime = block.timestamp;
-        }
-        
-        // Check daily mint limit
-        require(dailyMinted + swap.amount <= maxDailyMint, "Daily mint limit reached");
-        
-        // Update state before external calls to prevent reentrancy
+    
+        // Update state
         swap.state = SwapState.COMPLETED;
-        dailyMinted += swap.amount;
-        totalReserve += swap.amount;
-        
-        // Mint WXMR tokens to the recipient
-        wxmrToken.mintFromSwap(swap.recipient, swap.amount, swapId);
-        
-        emit SwapCompletedToEVM(swapId, swap.recipient, swap.amount, secret);
+    
+        emit SwapCompletedToXMR(swapId, secret);
     }
     
     /**
