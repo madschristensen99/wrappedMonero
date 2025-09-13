@@ -1,0 +1,28 @@
+{
+  "name": "risc0-xmr-wallet",
+  "version": "1.0.0",
+  "description": "TypeScript CLI for wxMR bridge hackathon",
+  "main": "dist/index.js",
+  "bin": {
+    "xmr-wallet": "./dist/cli.js"
+  },
+  "scripts": {
+    "build": "tsc",
+    "start": "node dist/cli.js",
+    "dev": "ts-node src/cli.ts"
+  },
+  "dependencies": {
+    "axios": "^1.6.0",
+    "commander": "^11.0.0",
+    "ethers": "^6.8.0",
+    "js-sha512": "^0.8.0",
+    "tweetnacl": "^1.0.3",
+    "chalk": "^4.1.2",
+    "ora": "^5.4.1"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "typescript": "^5.0.0",
+    "ts-node": "^10.9.0"
+  }
+}
