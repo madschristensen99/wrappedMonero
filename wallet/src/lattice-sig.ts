@@ -1,4 +1,4 @@
-import { sha512 } from 'js-sha512';
+import * as sha512 from 'js-sha512';
 
 export interface L2RSInput {
   privateKey: string;

@@ -1,8 +1,8 @@
 #!/usr/bin/env node
 import { Command } from 'commander';
 import chalk from 'chalk';
-import { generateWallet } from './wallet';
-import { submitBurn } from './bridge';
+import { Wallet } from './wallet';
+import { LatticeSigner } from './lattice-sig';
 import { Keys } from './keys';
 
 const program = new Command();
@@ -17,10 +17,11 @@ program
   .description('Generate new lattice key pair')
   .action(async () => {
     console.log(chalk.blue('Generating wallet...'));
-    const wallet = await generateWallet();
+    const keys = Keys.generate();
     console.log(chalk.green('Wallet generated!'));
-    console.log('SK:', wallet.sk);
-    console.log('PK:', wallet.pk);
+    console.log('SK:', keys.privateKey);
+    console.log('PK:', keys.publicKey);
+    console.log('Address:', keys.address);
   });
 
 program
@@ -33,19 +34,29 @@ program
   .action(async (options) => {
     console.log(chalk.blue('Submitting burn request...'));
     
-    const result = await submitBurn({
-      amount: options.amount,
-      destAddress: options.dest,
-      privateKey: options.privateKey,
-      relayUrl: options.relay
-    });
-    
-    if (result.success) {
-      console.log(chalk.green('Burn submitted successfully!'));
-      console.log('Transaction ID:', result.uuid);
-      console.log('Status check:', `${options.relay}/v1/status/${result.uuid}`);
-    } else {
-      console.log(chalk.red('Burn failed:'), result.error);
+    try {
+      const signer = new LatticeSigner();
+      const signature = await LatticeSigner.signL2RS({
+        privateKey: options.privateKey,
+        amount: options.amount,
+        destAddress: options.dest,
+        ring: [],
+        keyImage: "mock_key_image"
+      });
+      
+      const payload = {
+        tx_hash: "mock_tx_hash",
+        l2rs_sig: JSON.stringify(signature),
+        fhe_ciphertext: "mock_fhe_data",
+        amount_commit: signature.amount_commit,
+        key_image: signature.keyImage
+      };
+      
+      console.log(chalk.green('Mock burn prepared!'));
+      console.log('Payload:', JSON.stringify(payload, null, 2));
+      console.log('Status check:', `${options.relay}/v1/status/mock-uuid`);
+    } catch (error: any) {
+      console.log(chalk.red('Burn failed:'), error.message);
     }
   });
 
@@ -55,13 +66,19 @@ program
   .requiredOption('-u, --uuid <uuid>', 'Transaction UUID')
   .requiredOption('-r, --relay <url>', 'Relay service URL')
   .action(async (options) => {
-    const Keys = Keys.getInstance();
-    const status = await Keys.checkStatus(options.uuid, options.relay);
-    
-    console.log('Status:', status.status);
-    if (status.status === 'MINTED') {
-      console.log('Ethereum tx:', status.tx_hash_eth);
-      console.log('Amount:', status.amount);
+    try {
+      const response = await fetch(`${options.relay}/v1/status/${options.uuid}`);
+      const status = await response.json() as any;
+      
+      console.log('Status:', status.status);
+      if (status.status === 'MINTED') {
+        console.log('Ethereum tx:', status.eth_tx_hash);
+        console.log('Amount:', status.amount);
+      } else if (status.status === 'PENDING') {
+        console.log('Transaction is still processing...');
+      }
+    } catch (error: any) {
+      console.log(chalk.red('Status check failed:'), error.message);
     }
   });
 

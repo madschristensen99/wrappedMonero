@@ -18,11 +18,11 @@ async function main() {
     "wxMR"
   );
   
-  await wxMR.deployed();
+  await wxMR.waitForDeployment();
+  const address = await wxMR.getAddress();
   
-  console.log("wxMR deployed to:", wxMR.address);
-  console.log("Verifier:", await wxMR.verifier());
-  console.log("ImageID:", await wxMR.imageId());
+  console.log("wxMR deployed to:", address);
+  console.log("Update .env with WXMR_CONTRACT_ADDRESS=" + address);
 }
 
 main()
