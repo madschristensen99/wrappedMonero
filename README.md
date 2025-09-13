@@ -108,7 +108,7 @@ python tests/test_zkvm.py
 ## Hackathon Scope
 
 - Monero stagenet only
-- Polygon Mumbai testnet
+- Base Sepolia testnet
 - Manual XMR release on burn
 - Configurable for mainnet expansion
 

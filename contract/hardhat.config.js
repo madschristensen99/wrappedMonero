@@ -15,8 +15,8 @@ module.exports = {
     hardhat: {
       chainId: 1337
     },
-    mumbai: {
-      url: "https://polygon-mumbai.g.alchemy.com/v2/YOUR_KEY",
+    baseSepolia: {
+      url: "https://sepolia.base.org",
       accounts: ["YOUR_PRIVATE_KEY"]
     }
   }
