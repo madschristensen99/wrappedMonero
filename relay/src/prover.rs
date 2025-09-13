@@ -1,5 +1,4 @@
 use serde::{Deserialize, Serialize};
-use std::process::Command;
 
 #[derive(Debug, Serialize, Deserialize)]
 struct ProofRequest {
@@ -12,7 +11,7 @@ struct ProofRequest {
     policy_ok: bool,
 }
 
-pub async fn generate_receipt(payload: &crate::SubmitRequest) -> Result<Vec<u8>, Box<dyn std::error::Error>> {
+pub async fn generate_receipt(_payload: &crate::SubmitRequest) -> Result<Vec<u8>, Box<dyn std::error::Error>> {
     println!("Generating RISC Zero proof...");
     
     // Placeholder for actual RISC Zero proof generation

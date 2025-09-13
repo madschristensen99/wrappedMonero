@@ -1,13 +1,11 @@
-use ethers::prelude::*;
-use std::sync::Arc;
 
 pub async fn mint_with_proof(
-    receipt: &[u8],
-    amount: u64,
-    key_image: &str,
-    amount_commit: &str,
+    _receipt: &[u8],
+    _amount: u64,
+    _key_image: &str,
+    _amount_commit: &str,
 ) -> Result<String, Box<dyn std::error::Error>> {
-    println!("Submitting proof to contract for mint: {}", key_image);
+    println!("Submitting proof to contract for mint");
     
     // Placeholder for contract interaction
     // In production:

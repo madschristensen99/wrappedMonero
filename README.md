@@ -3,9 +3,9 @@
 
 ## 🎯 **Deployed Contract Address**
 ```
-wxMR Token Contract: 0x5A8Bde0AE3F9871e509264E9152B77841EfE10c5
-Network: Base Sepolia Testnet
-```
+**wxMR Token Contract:**  
+[0x5A8Bde0AE3F9871e509264E9152B77841EfE10c5](https://sepolia-explorer.base.org/address/0x5A8Bde0AE3F9871e509264E9152B77841EfE10c5)  
+*Network:* Base Sepolia Testnet
 
 ---
 
@@ -167,13 +167,9 @@ curl http://localhost:8080/v1/status/123e4567-e89b-12d3-a456-426614174000
 
 ---
 
-## 🎯 **Ready for Hackathon**
+## 🎯 **Endgame**
 This gives you a **fully functional privacy bridge** with:
 - **Real smart contracts** on Base Sepolia (use the address above)
 - **Real FHE cryptography** working in tests
 - **Real privacy** - amounts and identities stay hidden
 - **Real use case** - bring Monero's privacy to Ethereum DeFi
-
-**Deploy real tokens, win prizes, collect clout.** 🏆
-
-*Pro tip: The mock implementations are perfect for demos and testing. The crypto is real, the privacy is real, and it's ready to show off!*

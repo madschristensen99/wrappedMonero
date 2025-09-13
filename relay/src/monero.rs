@@ -1,4 +1,4 @@
-use serde::{Deserialize, Serialize};
+use serde::Deserialize;
 
 #[derive(Debug, Deserialize)]
 struct MoneroTx {
@@ -13,7 +13,7 @@ struct MoneroOutput {
     value: u64,
 }
 
-pub async fn verify_transaction(tx_hash: &str) -> Result<bool, Box<dyn std::error::Error>> {
+pub async fn verify_transaction(tx_hash: &str) -> Result<bool, Box<dyn std::error::Error>> { 
     // Placeholder for Monero RPC verification
     // In production: query monerod stagenet RPC
     println!("Verifying Monero transaction: {}", tx_hash);
@@ -24,7 +24,7 @@ pub async fn verify_transaction(tx_hash: &str) -> Result<bool, Box<dyn std::erro
     Ok(true)
 }
 
-pub fn verify_lattice_signature(sig: &str, key_image: &str) -> bool {
+pub fn verify_lattice_signature(_sig: &str, key_image: &str) -> bool {
     // Placeholder for lattice signature verification
     // In production: implement L2RS-CS verification
     println!("Verifying lattice signature for key image: {}", key_image);
