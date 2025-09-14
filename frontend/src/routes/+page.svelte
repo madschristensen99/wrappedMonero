@@ -9,7 +9,7 @@
 
     // Actual deployed contract address
     const CONTRACT_ADDRESS: string =
-        "0xb087c13f03b0b5a303d919cbf4d732b835afe434";
+        "0x25305b62299562197582eB87443B64B894685Fb4";
 
     let provider: BrowserProvider | null = null;
     let contract: Contract | null = null;
