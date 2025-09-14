@@ -1,17 +1,26 @@
 import { ethers } from "../ethers.min.js";
 
 // Contract ABI will be loaded from abi.json
+/** @type {any[] | null} */
 let CONTRACT_ABI = null;
 
 // Actual deployed contract address
+/** @type {string} */
 const CONTRACT_ADDRESS = "0xb087c13f03b0b5a303d919cbf4d732b835afe434";
 
+/** @type {ethers.BrowserProvider | null} */
 let provider = null;
+/** @type {ethers.JsonRpcSigner | null} */
 let signer = null;
+/** @type {ethers.Contract | null} */
 let contract = null;
+/** @type {string | undefined} */
 let userAddress;
 
-// Load contract ABI from file
+/**
+ * Load contract ABI from file
+ * @returns {Promise<void>}
+ */
 async function loadContractABI() {
     try {
         const response = await fetch('./abi.json');
@@ -26,7 +35,10 @@ async function loadContractABI() {
     }
 }
 
-// Initialize the app
+/**
+ * Initialize the app
+ * @returns {Promise<void>}
+ */
 async function initApp() {
     console.log("Initializing app...");
     console.log("Ethers available:", typeof ethers !== "undefined");
@@ -57,6 +69,10 @@ async function initApp() {
     }
 }
 
+/**
+ * Initialize event listeners for UI elements
+ * @returns {void}
+ */
 function initializeEventListeners() {
     // Wallet connection
     document
@@ -90,6 +106,10 @@ function initializeEventListeners() {
 
 }
 
+/**
+ * Try to auto-connect if previously connected
+ * @returns {Promise<void>}
+ */
 async function tryAutoConnect() {
     try {
         // Check if already connected
@@ -112,6 +132,10 @@ async function tryAutoConnect() {
     }
 }
 
+/**
+ * Connect to MetaMask wallet
+ * @returns {Promise<void>}
+ */
 async function connectWallet() {
     try {
         showLoading(true);
@@ -179,31 +203,24 @@ async function connectWallet() {
     }
 }
 
+/**
+ * Refresh user balance and total supply
+ * @returns {Promise<void>}
+ */
 async function refreshBalance() {
     if (!provider || !userAddress) {
         showError("Please connect your wallet first");
         return;
     }
 
-    try {
-        // Create contract instance with provider for reads
-        const readContract = new ethers.Contract(
-            CONTRACT_ADDRESS,
-            CONTRACT_ABI,
-            provider,
-        );
-
-        console.log("Fetching balance for address:", userAddress);
-        console.log("Contract address:", CONTRACT_ADDRESS);
-        const network = await provider.getNetwork();
-        console.log("Network:", network);
-        console.log("Chain ID:", network.chainId);
-    } catch (error) {
-        console.error("Error fetching balance:", error);
-        showError("Failed to fetch balance: " + error.message);
-    }
+    // TODO
 }
 
+/**
+ * Handle transfer form submission
+ * @param {Event} event - Form submit event
+ * @returns {Promise<void>}
+ */
 async function handleTransfer(event) {
     event.preventDefault();
 
@@ -239,6 +256,10 @@ async function handleTransfer(event) {
 }
 
 
+/**
+ * Fill receiver address with current wallet address
+ * @returns {void}
+ */
 function useCurrentWalletAddress() {
     if (!userAddress) {
         showError("Please connect your wallet first");
@@ -249,6 +270,11 @@ function useCurrentWalletAddress() {
     showSuccess("Current wallet address filled in");
 }
 
+/**
+ * Handle mint request form submission
+ * @param {Event} event - Form submit event
+ * @returns {Promise<void>}
+ */
 async function handleMintRequest(event) {
     event.preventDefault();
 
@@ -312,11 +338,20 @@ async function handleMintRequest(event) {
     }
 }
 
-// Utility functions
+/**
+ * Show or hide loading spinner
+ * @param {boolean} show - Whether to show loading
+ * @returns {void}
+ */
 function showLoading(show) {
     document.getElementById("loading").style.display = show ? "flex" : "none";
 }
 
+/**
+ * Show error message
+ * @param {string} message - Error message to display
+ * @returns {void}
+ */
 function showError(message) {
     document.getElementById("errorText").textContent = message;
     document.getElementById("error").style.display = "flex";
@@ -326,6 +361,11 @@ function showError(message) {
     );
 }
 
+/**
+ * Show success message
+ * @param {string} message - Success message to display
+ * @returns {void}
+ */
 function showSuccess(message) {
     document.getElementById("successText").textContent = message;
     document.getElementById("success").style.display = "flex";
@@ -335,6 +375,11 @@ function showSuccess(message) {
     );
 }
 
+/**
+ * Switch between tabs
+ * @param {string} tabName - Name of tab to switch to
+ * @returns {void}
+ */
 function switchTab(tabName) {
     // Update tab buttons
     document.querySelectorAll(".tab-btn").forEach((btn) => {
