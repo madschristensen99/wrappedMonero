@@ -25,7 +25,7 @@ impl KeyCombiner {
         let config = Config::load(config_path)?;
         let keys_dir = config.mpc.key_gen_output_path.clone();
         
-        info!("Loading validator TSS shares from {}...", keys_dir);
+        info!("Loading validator TSS shares from keys_dir: {} (absolute: {})", keys_dir, std::env::current_dir()?.join(&keys_dir).display());
         
         let mut shares = Vec::new();
         let mut eth_addresses = Vec::new();

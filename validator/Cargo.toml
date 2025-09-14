@@ -3,9 +3,6 @@ name = "validator-tss"
 version = "0.1.0"
 edition = "2021"
 
-[[bin]]
-name = "simple_validator"
-path = "src/simple_validator.rs"
 
 [dependencies]
 tokio = { version = "1", features = ["full"] }
