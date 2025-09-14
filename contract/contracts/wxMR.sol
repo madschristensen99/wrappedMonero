@@ -33,31 +33,24 @@ contract WrappedMonero is ERC20 {
     mapping(bytes32 => address) public mintRequestReceiver; // txSecret => receiver
     mapping(bytes32 => bool) public mintSecretUsed;        // txSecret => spent
 
-    /* --------------------------------------------------------------------------
-                                 EVENTS
-    -------------------------------------------------------------------------- */
-    event MintRequested(bytes32 indexed txSecret, address indexed receiver);
+    /* -------------------------------- Events -------------------------------- */
+    event MintRequested(bytes32 indexed txId, bytes32 indexed txSecret, address indexed receiver);
     event MintConfirmed(bytes32 indexed txSecret, address indexed receiver, uint256 amount);
     event Burn(address indexed from, uint256 amount);
 
-    /* --------------------------------------------------------------------------
-                               CONSTRUCTOR
-    -------------------------------------------------------------------------- */
     constructor() ERC20("Wrapped Monero", "WXMR") {
         _totalSupplyEnc = FHE.asEuint64(0);
         FHE.allowThis(_totalSupplyEnc);
     }
 
-    /* --------------------------------------------------------------------------
-                           1. USER REQUESTS MINT
-    -------------------------------------------------------------------------- */
-    function requestMint(bytes32 txSecret, address receiver) external {
+    /* ----------------------------- 1. Request Mint -------------------------- */
+    function requestMint(bytes32 txId, bytes32 txSecret, address receiver) external {
         require(receiver != address(0), "Bad receiver");
-        require(mintRequestReceiver[txSecret] == address(0), "Request already exists");
-        require(!mintSecretUsed[txSecret], "Secret already used");
+        require(mintRequestReceiver[txSecret] == address(0), "Request exists");
+        require(!mintSecretUsed[txSecret], "Secret used");
 
         mintRequestReceiver[txSecret] = receiver;
-        emit MintRequested(txSecret, receiver);
+        emit MintRequested(txId, txSecret, receiver);
     }
 
     /* --------------------------------------------------------------------------
