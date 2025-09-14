@@ -3,7 +3,7 @@ import json
 from dataclasses import dataclass
 import os
 import asyncio
-from typing import Optional, Union, NewType, TypedDict
+from typing import Any, Optional, Union, NewType, TypedDict
 from pathlib import Path
 import requests
 import dotenv
@@ -115,11 +115,29 @@ class ProcessedXmrMintRequest:
     transaction_secret: XmrTxKey
 
 
+@dataclass(kw_only=True, frozen=True)
+class PendingXmrMintRequest:
+    """Contains a mint request with pending XMR transaction."""
+
+    mint_request: WXmrMintRequest
+    xmr_pending: XmrPending
+
+
 class ProcessedRequestDict(TypedDict):
     """TypedDict for serializing processed requests to JSON."""
 
     transaction_id: str
     transaction_secret: str
+
+
+class PendingRequestDict(TypedDict):
+    """TypedDict for serializing pending requests to JSON."""
+
+    transaction_id: str
+    transaction_secret: str
+    receiver: str
+    evm_height: int
+    confirmations: int
 
 
 # event MintRequested(bytes32 indexed txId, bytes32 indexed txSecret, address indexed receiver, uint256 amount);
@@ -169,14 +187,16 @@ def get_mint_requests(
 XmrTxState = Union[XmrConfirmed, XmrPending, XmrNotFound]
 
 
-def test_monero_rpc_connection() -> None:
-    """Test the Monero RPC connection by calling get_version."""
-    payload = {
+def call_monero_rpc(method: str, params: Optional[dict[str, Any]] = None) -> dict:
+    """Make a JSON-RPC call to the Monero wallet RPC API."""
+    payload: Any = {
         "jsonrpc": "2.0",
         "id": "0",
-        "method": "get_version",
+        "method": method,
     }
-    logger.info("Testing Monero RPC connection...")
+
+    if params:
+        payload["params"] = params
 
     response = requests.post(
         MONERO_STAGENET_API + "/json_rpc",
@@ -193,10 +213,19 @@ def test_monero_rpc_connection() -> None:
         logger.error("Monero RPC error: %s", result["error"])
         raise RuntimeError(f"Monero RPC error: {result['error']}")
 
-    version = result["result"]["version"]
+    return result["result"]
+
+
+def test_monero_rpc_connection() -> None:
+    """Test the Monero RPC connection by calling get_version."""
+    logger.info("Testing Monero RPC connection...")
+
+    result = call_monero_rpc("get_version")
+
+    version = result["version"]
     major = version >> 16
     minor = version & 0xFFFF
-    logger.info("Monero RPC connection successful. Version: %d.%d", major, minor)
+    logger.info("Monero RPC connection to %s successful. Version: %d.%d", MONERO_STAGENET_API, major, minor)
 
 
 # https://docs.getmonero.org/rpc-library/wallet-rpc/#check_tx_key
@@ -204,34 +233,20 @@ def check_xmr_tx_key(
     txid: XmrTxId, address: XmrAddress, tx_key: XmrTxKey
 ) -> XmrTxState:
     """Check a Monero transaction key using the wallet RPC API."""
-    payload = {
-        "jsonrpc": "2.0",
-        "id": "0",
-        "method": "check_tx_key",
-        "params": {"txid": txid.hex(), "tx_key": tx_key.hex(), "address": address},
-    }
+    params = {"txid": txid.hex(), "tx_key": tx_key.hex(), "address": address}
+
     logger.info("Checking XMR tx %s", txid)
 
-    response = requests.post(
-        MONERO_STAGENET_API + "/json_rpc",
-        json=payload,
-        headers={"Content-Type": "application/json"},
-        auth=HTTPDigestAuth("monero", "rpcPassword"),
-    )
-    response.raise_for_status()
-
-    result = response.json()
-
-    if "error" in result:
-        logger.error("Monero RPC error: %s", result["error"])
+    try:
+        data = call_monero_rpc("check_tx_key", params)
+    except RuntimeError:
         return XmrNotFound(txid=txid, address=address, tx_key=tx_key)
 
-    data = result["result"]
     confirmations = data["confirmations"]
-    in_pool = data["in_pool"]
+    in_pool: bool = data["in_pool"]
     received = XmrAmount(data["received"])
 
-    enough_confirmations = confirmations >= MONERO_REQUIRED_CONFIRMATIONS
+    enough_confirmations: bool = confirmations >= MONERO_REQUIRED_CONFIRMATIONS
     match in_pool, enough_confirmations:
         case True, _:
             return XmrPending(
@@ -339,6 +354,91 @@ def add_processed_request(processed_request: ProcessedXmrMintRequest) -> None:
         data_file.write_text(json.dumps(data, indent=2))
 
 
+def get_pending_requests() -> set[PendingXmrMintRequest]:
+    """Get the set of pending XMR mint requests."""
+    data_file = Path("data/pending_requests.json")
+
+    if not data_file.exists():
+        return set()
+
+    data: list[PendingRequestDict] = json.loads(data_file.read_text())
+    pending = set()
+    for item in data:
+        mint_request = WXmrMintRequest(
+            txid=XmrTxId(bytes.fromhex(item["transaction_id"])),
+            tx_key=XmrTxKey(bytes.fromhex(item["transaction_secret"])),
+            receiver=EvmAddress(HexAddress(HexStr(item["receiver"]))),
+            evm_height=EvmHeight(item["evm_height"]),
+        )
+        xmr_pending = XmrPending(
+            txid=XmrTxId(bytes.fromhex(item["transaction_id"])),
+            tx_key=XmrTxKey(bytes.fromhex(item["transaction_secret"])),
+            address=XMR_RECEIVE_ADDRESS,
+            confirmations=item["confirmations"],
+        )
+        pending.add(
+            PendingXmrMintRequest(mint_request=mint_request, xmr_pending=xmr_pending)
+        )
+
+    return pending
+
+
+def add_pending_request(pending_request: PendingXmrMintRequest) -> None:
+    """Add a pending XMR mint request to the tracking file."""
+    data_file = Path("data/pending_requests.json")
+
+    # Create directory if it doesn't exist
+    data_file.parent.mkdir(exist_ok=True)
+
+    # Load existing data or create empty list
+    if data_file.exists():
+        data: list[PendingRequestDict] = json.loads(data_file.read_text())
+    else:
+        data = []
+
+    # Add new request if not already present
+    new_request: PendingRequestDict = {
+        "transaction_id": pending_request.mint_request.txid.hex(),
+        "transaction_secret": pending_request.mint_request.tx_key.hex(),
+        "receiver": pending_request.mint_request.receiver,
+        "evm_height": pending_request.mint_request.evm_height,
+        "confirmations": pending_request.xmr_pending.confirmations,
+    }
+
+    # Check if request already exists (by txid and tx_key)
+    existing = any(
+        item["transaction_id"] == new_request["transaction_id"]
+        and item["transaction_secret"] == new_request["transaction_secret"]
+        for item in data
+    )
+
+    if not existing:
+        data.append(new_request)
+        data_file.write_text(json.dumps(data, indent=2))
+
+
+def remove_pending_request(pending_request: PendingXmrMintRequest) -> None:
+    """Remove a pending XMR mint request from the tracking file."""
+    data_file = Path("data/pending_requests.json")
+
+    if not data_file.exists():
+        return
+
+    data: list[PendingRequestDict] = json.loads(data_file.read_text())
+
+    # Remove the request
+    data = [
+        item
+        for item in data
+        if not (
+            item["transaction_id"] == pending_request.mint_request.txid.hex()
+            and item["transaction_secret"] == pending_request.mint_request.tx_key.hex()
+        )
+    ]
+
+    data_file.write_text(json.dumps(data, indent=2))
+
+
 def mint_w_xmr(
     contract: Contract, w3: Web3, amount: XmrAmount, tx_secret: XmrTxKey
 ) -> None:
@@ -414,9 +514,16 @@ def process_revealed_txs(contract: Contract, w3: Web3) -> None:
 
     # 2. Go over list of mint requests on EVM,
     min_block_height = get_min_block_height(w3)
-    new_requests = get_mint_requests(contract, min_block_height, confirmed_block)
+    log_requests = get_mint_requests(contract, min_block_height, confirmed_block)
 
-    # 2. Check for which revealed txs we already minted wXMR, filter them out
+    # 2b. Get pending requests and convert them to WXmrMintRequest format
+    pending_requests = get_pending_requests()
+    pending_mint_requests = [pending.mint_request for pending in pending_requests]
+
+    # 2c. Concatenate log requests and pending requests
+    new_requests = log_requests + pending_mint_requests
+
+    # 3. Check for which revealed txs we already minted wXMR, filter them out
     processed_requests = get_processed_requests()
     processed_tuples = {
         (p.transaction_id, p.transaction_secret) for p in processed_requests
@@ -428,24 +535,65 @@ def process_revealed_txs(contract: Contract, w3: Web3) -> None:
     ]
 
     logger.info(
-        "Found %d unprocessed mint requests out of %d total",
+        "Found %d unprocessed mint requests out of %d total (%d from logs, %d from pending)",
         len(unprocessed_requests),
         len(new_requests),
+        len(log_requests),
+        len(pending_mint_requests),
     )
 
-    # 3. For each remaining address, find the matching, confirmed XMR deposit
+    # 4. For each remaining request, check XMR transaction state
     confirmed_requests: list[ConfirmedXmrMintRequest] = []
     for request in unprocessed_requests:
-        xmr_confirmed = match_mint_request(request)
-        if xmr_confirmed is None:
-            continue
-        confirmed_requests.append(
-            ConfirmedXmrMintRequest(mint_request=request, xmr_confirmed=xmr_confirmed)
-        )
+        state = check_xmr_tx_key(request.txid, XMR_RECEIVE_ADDRESS, request.tx_key)
+
+        match state:
+            case XmrConfirmed() if state.confirmations >= MONERO_REQUIRED_CONFIRMATIONS:
+                # Transaction is confirmed, process immediately
+                confirmed_requests.append(
+                    ConfirmedXmrMintRequest(mint_request=request, xmr_confirmed=state)
+                )
+                # If this was from pending requests, remove it from pending
+                for pending_request in pending_requests:
+                    if (
+                        pending_request.mint_request.txid == request.txid
+                        and pending_request.mint_request.tx_key == request.tx_key
+                    ):
+                        remove_pending_request(pending_request)
+                        break
+            case XmrPending():
+                # Transaction is pending, add to pending queue (if not already there)
+                is_already_pending = any(
+                    pending.mint_request.txid == request.txid
+                    and pending.mint_request.tx_key == request.tx_key
+                    for pending in pending_requests
+                )
+                if not is_already_pending:
+                    pending_request = PendingXmrMintRequest(
+                        mint_request=request, xmr_pending=state
+                    )
+                    add_pending_request(pending_request)
+                    logger.info(
+                        "Added pending request %s with %d confirmations",
+                        request.txid.hex(),
+                        state.confirmations,
+                    )
+            case XmrNotFound():
+                # Transaction not found, remove from pending if it was there
+                for pending_request in pending_requests:
+                    if (
+                        pending_request.mint_request.txid == request.txid
+                        and pending_request.mint_request.tx_key == request.tx_key
+                    ):
+                        remove_pending_request(pending_request)
+                        break
+                logger.warning(
+                    "XMR transaction %s not found for mint request", request.txid.hex()
+                )
 
     logger.info("Found %d confirmed XMR mint requests", len(confirmed_requests))
 
-    # 4. Send a mint transaction to the wXMR
+    # 5. Send a mint transaction to the wXMR
     #    contract with the matching amount of wXMR to the receive address
     minted_requests: set[ProcessedXmrMintRequest] = set()
     for confirmed_request in confirmed_requests:
@@ -473,11 +621,11 @@ def process_revealed_txs(contract: Contract, w3: Web3) -> None:
         )
         minted_requests.add(processed_request)
 
-    # 5. Mark minted requests as processed
+    # 6. Mark minted requests as processed
     for minted_request in minted_requests:
         add_processed_request(minted_request)
 
-    # 6. Store the confirmed block height as the new last_checked
+    # 7. Store the confirmed block height as the new last_checked
     set_min_block_height(confirmed_block)
 
 
@@ -492,7 +640,7 @@ async def main() -> None:
 
     w3 = Web3(Web3.HTTPProvider(EVM_SEPOLIA_API))
     assert w3.is_connected()
-    logging.info("Connected to EVM api at %s", EVM_SEPOLIA_API)
+    logger.info("Connected to EVM api at %s", EVM_SEPOLIA_API)
 
     w_xmr_contract: Contract = w3.eth.contract(
         address=W_XMR_CONTRACT_ADDRESS, abi=w_xmr_contract_abi
