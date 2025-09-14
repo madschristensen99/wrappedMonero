@@ -18,7 +18,7 @@ process = subprocess.Popen([
 ], stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
 
 # Execute transfer to valid stagenet address
-stagenet_address = "7fKB4yxqVBk71Kj5zUPL3tYqUBBSUuGqMYuqYLdyFbCq4MkgzWwN5LFQBcGTHc"
+stagenet_address = "522uRegTJQ4T87co7agAEBNW8i8drt1nhUi5RTuJBT5Ybh3sF22Co19E2Lz3aPKHV7ZRCqERdMfjpAqC5kcEZKAJ7GfuXpP"
 print(f"Executing: transfer {stagenet_address} 0.001001")
 process.stdin.write(f"transfer {stagenet_address} 0.001001\n")
 process.stdin.write("y\n")

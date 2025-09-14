@@ -7,7 +7,7 @@ interface IRiscZeroVerifier {
     function verify(
         bytes calldata seal,
         bytes32 imageId,
-        bytes calldata journal
+        bytes32 journalDigest
     ) external view returns (bool);
 }
 
@@ -33,16 +33,16 @@ contract WxMR is ERC20 {
         bytes calldata seal,
         uint256 amount,
         bytes32 KI_hash,
-        uint256 amount_commit
+        bytes32 amount_commit
     ) external {
-        bytes memory journal = abi.encodePacked(
+        bytes32 journalDigest = keccak256(abi.encodePacked(
             KI_hash,
             amount_commit,
             uint8(1)
-        );
+        ));
         
         require(
-            IRiscZeroVerifier(verifier).verify(seal, imageId, journal),
+            IRiscZeroVerifier(verifier).verify(seal, imageId, journalDigest),
             "invalid receipt"
         );
         require(!spent[KI_hash], "KI spent");

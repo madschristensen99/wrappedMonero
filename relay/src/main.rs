@@ -187,15 +187,34 @@ async fn process_burn(uuid: String, payload: SubmitRequest) {
         return;
     }
     
-    // 4. Generate mock proof (hackathon version)
-    let _amount = 1_000_000_000_000u64; // Default 1 XMR
-    let eth_tx_hash = format!("0x{:x}{}", uuid.trim_start_matches("-")[..40].parse::<u64>().unwrap_or(0x1234), uuid);
+    // 4. Generate real RISC Zero proof
+    let receipt = match crate::prover::generate_receipt(&payload).await {
+        Ok(receipt) => receipt,
+        Err(e) => {
+            println!("❌ Failed to generate proof: {}", e);
+            let _ = sqlx::query("UPDATE burns SET status = 'FAILED' WHERE uuid = ?")
+                .bind(&uuid)
+                .execute(&pool)
+                .await;
+            return;
+        }
+    };
     
-    let _ = sqlx::query("UPDATE burns SET status = 'MINTED', eth_tx_hash = ? WHERE uuid = ?")
-        .bind(eth_tx_hash.clone())
-        .bind(&uuid)
-        .execute(&pool)
-        .await;
+    // 5. Extract amount for minting
+    let amount = 1_000_000_000_000u64; // Default 1 XMR, decode from FHE in production
+    
+    // 6. Submit proof to contract for minting
+    let eth_tx_hash = match crate::contract::mint_with_proof(&receipt, amount, &payload.key_image, &payload.amount_commit).await {
+        Ok(tx_hash) => tx_hash,
+        Err(e) => {
+            println!("❌ Failed to mint on contract: {}", e);
+            let _ = sqlx::query("UPDATE burns SET status = 'FAILED' WHERE uuid = ?")
+                .bind(&uuid)
+                .execute(&pool)
+                .await;
+            return;
+        }
+    };
     
     let _ = sqlx::query("INSERT INTO key_images (key_image, used) VALUES (?, TRUE)")
         .bind(&payload.key_image)
