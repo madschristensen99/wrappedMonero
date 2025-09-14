@@ -37,8 +37,8 @@ The system consists of three main components:
    - MetaMask integration
    - Transfer, mint, and burn functionality
    - Real-time balance updates
-   -
- ## Deployed Contract Address
+
+## Deployed Contract Address
 [0x25305b62299562197582eB87443B64B894685Fb4](https://sepolia.etherscan.io/address/0x25305b62299562197582eB87443B64B894685Fb4)
 
 ## Usage
@@ -47,20 +47,20 @@ The system consists of three main components:
 
 Here's how to **set up** everything
 
-1. Install dependencies for bridge  by running `uv sync` inside
+1. Install dependencies for bridge by running `uv sync` inside
    the `bridge/` directory.
 2. Install dependencies for the frontend by running `npm i` inside
-   the `frontend/` directory
-3. Install the monero cli tools and make sure that you have the
+   the `frontend/` directory.
+3. Install the Monero CLI tools and make sure that you have the
    `monero-wallet-rpc` program available in your terminal.
 4. Create a Monero wallet that receives the XMR to be wrapped and make sure
-   that it's available in a directory that `monero-wallet-rpc` can access
+   that it's available in a directory that `monero-wallet-rpc` can access.
 
 Here's how to **start up** everything
 
-1. Start the monero wallet rpc endpoint by running `bridge/bin/monero-cli`
-1. Start bridge by running `uv run ./main.py` inside the `bridge/` directory.
-2. Start the frontend by running `npm run dev` inside the `frontend/`
+1. Start the Monero wallet RPC endpoint by running `bridge/bin/monero-cli`.
+2. Start the bridge program by running `uv run ./main.py` inside the `bridge/` directory.
+3. Start the frontend by running `npm run dev` inside the `frontend/`
    directory.
 
 Here's how to make a demo transaction
@@ -70,12 +70,12 @@ Here's how to make a demo transaction
 3. Press the **Copy** button under *Bridge Monero Address*
 ![monero-address-copied](docs/monero-address-copied.png)
 4. In your Monero wallet, paste the *Bridge Monero Address* and send an arbitrary amount of XMR to this *Bridge Monero
-   address*. The screenshot shows how it looks like in **Feather** wallet
+   address*. The screenshot shows how it looks in **Feather** wallet
 ![entering-bridge-monero-address](docs/entering-bridge-monero-address.png)
-5. Initiate the transaction. The screenshot shows how it looks like in
+5. Initiate the transaction. The screenshot shows how it looks in
    **Feather wallet** after you press the **Send** button.
 ![feather-wallet-confirm](docs/feather-wallet-confirm.png)
-6. Confirm the transaction and review the transaction details. The following screenshots shows the confirmation notice after
+6. Confirm the transaction and review the transaction details. The following screenshots show the confirmation notice after
    pressing **Send** inside the *Confirm transaction* dialog and then
    selecting **Show details**.
 ![Screenshot showing the transaction sent confirmation](docs/feather-transaction-sent.png)
@@ -85,7 +85,7 @@ Here's how to make a demo transaction
    TX Secret Key**. Press each button and then go to the matching fields
    **Monero Transaction ID** and **Transaction Secret Key** and paste the
    values there.
-![Screenshot showing the transaction id and secret in the Wrapped Monero UI](./request-mint-details.png)
+![Screenshot showing the transaction id and secret in the Wrapped Monero UI](docs/request-mint-details.png)
 8. To receive the Wrapped Monero yourself, you can press the **Send to current
    wallet address** button. If you want to mint the Wrapped Monero for someone
    else, you can enter their wallet address as well.
@@ -93,7 +93,7 @@ Here's how to make a demo transaction
    confirm the transaction. The screenshot shows Metamask's **Transaction
    request** screen. Press **Confirm**. Metamask shows a **Confirmed transaction**
    after some time.
-![metamask-confirmed-transaction](docs/metamask-confirmed-transaction.png)
+![Screenshot showing MetaMask confirmed transaction](docs/metamask-confirmed-transaction.png)
 10. You have now requested a mint. The bridge searches for your mint request
     and gives you Wrapped Monero.
 ![Screenshot showing the bridge's log output when it confirms a mint request](docs/bridge-mint-logs.png)

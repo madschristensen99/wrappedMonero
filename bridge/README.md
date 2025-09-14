@@ -18,7 +18,7 @@ commands are available in your terminal:
 - `monero-wallet-cli`
 - `monero-wallet-rpc`
 
-Change to the `bridge/` directory inside this repository. Here, you need
+Change to the `bridge/` directory inside this repository. Here, you need to
 install all dependencies with [uv](https://docs.astral.sh/uv/):
 
 ```bash
@@ -35,14 +35,14 @@ cp .env.template .env
 
 Populate the values inside `.env`:
 
-- Set `ETH_PRIVATE_KEY` to match the private key of the wrapped Monero mint authority's
-address
+- Set `ETH_PRIVATE_KEY` to match the private key of the Wrapped Monero mint authority's
+  address
 - Set `XMR_RECEIVE_ADDRESS` to match a Monero receive address that the Monero mint
   authority owns
 - Set `W_XMR_CONTRACT_ADDRESS` to match the Wrapped Monero smart contract's
   address
 
-Configure the Monero RPC Api by editing the `bin/monero-rpc` file. Change the
+Configure the Monero RPC API by editing the `bin/monero-rpc` file. Change the
 following line and make sure that it contains a path to a valid Monero wallet:
 
 ```patch
@@ -68,17 +68,17 @@ bin/monero-rpc
 Then, run the bridge with the following command:
 
 ```bash
-uv ./main.py
+uv run ./main.py
 ```
 
 
 # Monero operations
 
-## Check whether a monero transaction exists and has been confirmed
+## Check whether a Monero transaction exists and has been confirmed
 
 From: <https://docs.getmonero.org/rpc-library/wallet-rpc/#check_tx_key>
 
-check_tx_key¶
+check_tx_key
 
 Check a transaction in the blockchain with its secret key.
 
@@ -117,4 +117,4 @@ curl -X POST http://127.0.0.1:18088/json_rpc -d \
 # Docs
 
 - Ethereum web3py: <https://web3py.readthedocs.io/en/stable/transactions.html>
-- Monery python: <https://monero-python.readthedocs.io/en/latest/quickstart.html>
+- Monero python: <https://monero-python.readthedocs.io/en/latest/quickstart.html>
