@@ -27,7 +27,7 @@ EVM_REQUIRED_CONFIRMATIONS = 1
 # https://monero.fail/?chain=monero&network=stagenet
 MONERO_STAGENET_API = "http://localhost:38081"
 # Completely arbitrary
-MONERO_REQUIRED_CONFIRMATIONS = 6
+MONERO_REQUIRED_CONFIRMATIONS = 1
 
 # Gas estimation buffer (20% extra)
 GAS_BUFFER_MULTIPLIER = 1.2
