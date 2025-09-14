@@ -5,9 +5,10 @@ import {ERC20} from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import {FHE, euint64} from "@fhenixprotocol/cofhe-contracts/FHE.sol";
 
 /**
- * @title  Wrapped Monero (WXMR)
- * @notice Encrypted balances via Fhenix FHE.
- *         Mint/burn guarded by 3-of-3 multisig (fixed wallets).
+ * @title  Wrapped Monero (WXMR) – encrypted balances, 3-of-3 multisig confirmMint
+ * @notice Two-step mint:
+ *            1. user: requestMint(txSecret, receiver)
+ *            2. operators: confirmMint(txSecret, amount, 3 sigs)
  */
 contract WrappedMonero is ERC20 {
     /* --------------------------------------------------------------------------
@@ -28,6 +29,12 @@ contract WrappedMonero is ERC20 {
     mapping(address => euint64) private _lastDecryptedBalance;
 
     /* --------------------------------------------------------------------------
+                               MINT REQUESTS
+    -------------------------------------------------------------------------- */
+    mapping(bytes32 => address) public mintRequestReceiver; // txSecret => receiver
+    mapping(bytes32 => bool) public mintSecretUsed;        // txSecret => spent
+
+    /* --------------------------------------------------------------------------
                                OWNER
     -------------------------------------------------------------------------- */
     address private _owner;
@@ -39,7 +46,8 @@ contract WrappedMonero is ERC20 {
     /* --------------------------------------------------------------------------
                                  EVENTS
     -------------------------------------------------------------------------- */
-    event Mint(address indexed to, uint256 amount);
+    event MintRequested(bytes32 indexed txSecret, address indexed receiver);
+    event MintConfirmed(bytes32 indexed txSecret, address indexed receiver, uint256 amount);
     event Burn(address indexed from, uint256 amount);
 
     /* --------------------------------------------------------------------------
@@ -56,7 +64,7 @@ contract WrappedMonero is ERC20 {
                               MULTISIG VERIFICATION
     -------------------------------------------------------------------------- */
     function _recover(
-        address to,
+        bytes32 txSecret,
         uint64 amount,
         uint256 nonce,
         uint8 v,
@@ -66,45 +74,79 @@ contract WrappedMonero is ERC20 {
         uint256 chainId;
         assembly { chainId := chainid() }
         bytes32 digest = keccak256(
-            abi.encodePacked("WrappedMonero", chainId, nonce, to, amount)
+            abi.encodePacked("WrappedMonero-confirmMint", chainId, nonce, txSecret, amount)
         );
         return ecrecover(digest, v, r, s);
     }
 
     /* --------------------------------------------------------------------------
-                                 MINT
+                           1. USER REQUESTS MINT
     -------------------------------------------------------------------------- */
-    uint256 private _mintNonce;
+    function requestMint(bytes32 txSecret, address receiver) external {
+        require(receiver != address(0), "Bad receiver");
+        require(mintRequestReceiver[txSecret] == address(0), "Request already exists");
+        require(!mintSecretUsed[txSecret], "Secret already used");
 
-    function mint(
-        address to,
+        mintRequestReceiver[txSecret] = receiver;
+        emit MintRequested(txSecret, receiver);
+    }
+
+    /* --------------------------------------------------------------------------
+                           2. OPERATORS CONFIRM MINT
+    -------------------------------------------------------------------------- */
+    uint256 private _confirmNonce;
+
+    function confirmMint(
+        bytes32 txSecret,
         uint64 amount,
         uint8[3] calldata v,
         bytes32[3] calldata r,
         bytes32[3] calldata s
     ) external {
-        uint256 nonce = _mintNonce++;
+        address receiver = mintRequestReceiver[txSecret];
+        require(receiver != address(0), "Mint request not found");
+        require(!mintSecretUsed[txSecret], "Secret already used");
+
+        uint256 nonce = _confirmNonce++;
         require(
-            _recover(to, amount, nonce, v[0], r[0], s[0]) == SIGNER_1 &&
-            _recover(to, amount, nonce, v[1], r[1], s[1]) == SIGNER_2 &&
-            _recover(to, amount, nonce, v[2], r[2], s[2]) == SIGNER_3,
+            _recover(txSecret, amount, nonce, v[0], r[0], s[0]) == SIGNER_1 &&
+            _recover(txSecret, amount, nonce, v[1], r[1], s[1]) == SIGNER_2 &&
+            _recover(txSecret, amount, nonce, v[2], r[2], s[2]) == SIGNER_3,
             "Invalid 3-of-3 multisig"
         );
 
+        mintSecretUsed[txSecret] = true;           // mark spent
+        delete mintRequestReceiver[txSecret];      // clean up
+
         euint64 amtEnc = FHE.asEuint64(amount);
         _totalSupplyEnc = FHE.add(_totalSupplyEnc, amtEnc);
-        _balancesEnc[to] = FHE.add(_balancesEnc[to], amtEnc);
+        _balancesEnc[receiver] = FHE.add(_balancesEnc[receiver], amtEnc);
 
         FHE.allowThis(_totalSupplyEnc);
-        FHE.allowThis(_balancesEnc[to]);
+        FHE.allowThis(_balancesEnc[receiver]);
 
-        emit Mint(to, amount);
+        emit MintConfirmed(txSecret, receiver, amount);
     }
 
     /* --------------------------------------------------------------------------
                                  BURN
     -------------------------------------------------------------------------- */
     uint256 private _burnNonce;
+
+    function _recoverBurn(
+        uint64 amount,
+        uint256 nonce,
+        uint8 v,
+        bytes32 r,
+        bytes32 s
+    ) internal view returns (address) {
+        uint256 chainId;
+        assembly { chainId := chainid() }
+        bytes32 digest = keccak256(
+            abi.encodePacked("WrappedMonero-burn", chainId, nonce, msg.sender, amount)
+        );
+        return ecrecover(digest, v, r, s);
+    }
 
     function burn(
         uint64 amount,
@@ -114,9 +156,9 @@ contract WrappedMonero is ERC20 {
     ) external {
         uint256 nonce = _burnNonce++;
         require(
-            _recover(msg.sender, amount, nonce, v[0], r[0], s[0]) == SIGNER_1 &&
-            _recover(msg.sender, amount, nonce, v[1], r[1], s[1]) == SIGNER_2 &&
-            _recover(msg.sender, amount, nonce, v[2], r[2], s[2]) == SIGNER_3,
+            _recoverBurn(amount, nonce, v[0], r[0], s[0]) == SIGNER_1 &&
+            _recoverBurn(amount, nonce, v[1], r[1], s[1]) == SIGNER_2 &&
+            _recoverBurn(amount, nonce, v[2], r[2], s[2]) == SIGNER_3,
             "Invalid 3-of-3 multisig"
         );
 
