@@ -83,6 +83,40 @@ class WXmrMintRequest:
 
 
 @dataclass(kw_only=True, frozen=True)
+class WXmrBurnRequest:
+    """Contains the information needed to process a wXMR burn."""
+
+    user_address: EvmAddress
+    amount: XmrAmount
+    xmr_destination: XmrAddress
+    evm_height: EvmHeight
+    # Transaction hash of the burn event for tracking
+    burn_tx_hash: str
+
+
+@dataclass(kw_only=True, frozen=True)
+class ProcessedXmrBurnRequest:
+    """Contains the information about a processed XMR burn request."""
+
+    burn_tx_hash: str
+    user_address: EvmAddress
+    amount: XmrAmount
+    xmr_destination: XmrAddress
+    # The XMR transaction ID that was sent
+    xmr_tx_id: Optional[XmrTxId]
+
+
+@dataclass(kw_only=True, frozen=True)
+class PendingXmrBurnRequest:
+    """Contains a burn request that is pending XMR transfer."""
+
+    burn_request: WXmrBurnRequest
+    # Optional: track attempts and failures
+    attempts: int = 0
+    last_error: Optional[str] = None
+
+
+@dataclass(kw_only=True, frozen=True)
 class ConfirmedXmrMintRequest:
     """Contains a mint request with confirmed XMR transaction."""
 
@@ -129,6 +163,29 @@ class PendingRequestDict(TypedDict):
     receiver: str
     evm_height: int
     confirmations: int
+
+
+class ProcessedBurnDict(TypedDict):
+    """TypedDict for serializing processed burn requests to JSON."""
+
+    burn_tx_hash: str
+    user_address: str
+    amount: int
+    xmr_destination: str
+    xmr_tx_id: Optional[str]
+    processed_at: str  # ISO timestamp
+
+
+class PendingBurnRequestDict(TypedDict):
+    """TypedDict for serializing pending burn requests to JSON."""
+
+    burn_tx_hash: str
+    user_address: str
+    amount: int
+    xmr_destination: str
+    evm_height: int
+    attempts: int
+    last_error: Optional[str]
 
 
 # event MintRequested(bytes32 indexed txId, bytes32 indexed txSecret, address indexed receiver, uint256 amount);
@@ -191,18 +248,16 @@ def call_monero_rpc(
     if params:
         payload["params"] = params
 
-    try:
-        response = requests.post(
-            MONERO_STAGENET_API + "/json_rpc",
-            json=payload,
-            headers={"Content-Type": "application/json"},
-            auth=HTTPDigestAuth("monero", "rpcPassword"),
-            timeout=10,
-        )
-        response.raise_for_status()
-    except requests.RequestException as e:
-        logger.error("Monero RPC request failed: %s", e)
-        return MoneroRpcError(error_code=None, error_message=str(e))
+    response = requests.post(
+        MONERO_STAGENET_API + "/json_rpc",
+        json=payload,
+        headers={"Content-Type": "application/json"},
+        auth=HTTPDigestAuth("monero", "rpcPassword"),
+        timeout=10,
+    )
+    if not response.ok:
+        logger.error("Monero RPC request failed")
+        return MoneroRpcError(error_code=None, error_message=response.text)
 
     try:
         response_json = response.json()
@@ -467,6 +522,142 @@ def remove_pending_request(pending_request: PendingXmrMintRequest) -> None:
     data_file.write_text(json.dumps(data, indent=2))
 
 
+def get_processed_burn_requests() -> set[ProcessedXmrBurnRequest]:
+    """Get the set of already processed XMR burn requests."""
+    data_file = Path("data/processed_burns.json")
+
+    if not data_file.exists():
+        return set()
+
+    data: list[ProcessedBurnDict] = json.loads(data_file.read_text())
+    processed = set()
+    for item in data:
+        xmr_tx_id = XmrTxId(bytes.fromhex(item["xmr_tx_id"])) if item["xmr_tx_id"] else None
+        processed.add(
+            ProcessedXmrBurnRequest(
+                burn_tx_hash=item["burn_tx_hash"],
+                user_address=EvmAddress(HexAddress(HexStr(item["user_address"]))),
+                amount=XmrAmount(item["amount"]),
+                xmr_destination=XmrAddress(item["xmr_destination"]),
+                xmr_tx_id=xmr_tx_id,
+            )
+        )
+
+    return processed
+
+
+def add_processed_burn_request(processed_request: ProcessedXmrBurnRequest) -> None:
+    """Add a processed XMR burn request to the tracking file."""
+    from datetime import datetime
+
+    data_file = Path("data/processed_burns.json")
+
+    # Create directory if it doesn't exist
+    data_file.parent.mkdir(exist_ok=True)
+
+    # Load existing data or create empty list
+    if data_file.exists():
+        data: list[ProcessedBurnDict] = json.loads(data_file.read_text())
+    else:
+        data = []
+
+    # Add new request if not already present
+    new_request: ProcessedBurnDict = {
+        "burn_tx_hash": processed_request.burn_tx_hash,
+        "user_address": processed_request.user_address,
+        "amount": processed_request.amount,
+        "xmr_destination": processed_request.xmr_destination,
+        "xmr_tx_id": processed_request.xmr_tx_id.hex() if processed_request.xmr_tx_id else None,
+        "processed_at": datetime.utcnow().isoformat(),
+    }
+
+    # Check if request already exists (by burn_tx_hash)
+    existing = any(item["burn_tx_hash"] == new_request["burn_tx_hash"] for item in data)
+
+    if not existing:
+        data.append(new_request)
+        data_file.write_text(json.dumps(data, indent=2))
+
+
+def get_pending_burn_requests() -> set[PendingXmrBurnRequest]:
+    """Get the set of pending XMR burn requests."""
+    data_file = Path("data/pending_burn_requests.json")
+
+    if not data_file.exists():
+        return set()
+
+    data: list[PendingBurnRequestDict] = json.loads(data_file.read_text())
+    pending = set()
+    for item in data:
+        burn_request = WXmrBurnRequest(
+            user_address=EvmAddress(HexAddress(HexStr(item["user_address"]))),
+            amount=XmrAmount(item["amount"]),
+            xmr_destination=XmrAddress(item["xmr_destination"]),
+            evm_height=EvmHeight(item["evm_height"]),
+            burn_tx_hash=item["burn_tx_hash"],
+        )
+        pending.add(
+            PendingXmrBurnRequest(
+                burn_request=burn_request,
+                attempts=item["attempts"],
+                last_error=item["last_error"],
+            )
+        )
+
+    return pending
+
+
+def add_pending_burn_request(pending_request: PendingXmrBurnRequest) -> None:
+    """Add a pending XMR burn request to the tracking file."""
+    data_file = Path("data/pending_burn_requests.json")
+
+    # Create directory if it doesn't exist
+    data_file.parent.mkdir(exist_ok=True)
+
+    # Load existing data or create empty list
+    if data_file.exists():
+        data: list[PendingBurnRequestDict] = json.loads(data_file.read_text())
+    else:
+        data = []
+
+    # Add new request if not already present
+    new_request: PendingBurnRequestDict = {
+        "burn_tx_hash": pending_request.burn_request.burn_tx_hash,
+        "user_address": pending_request.burn_request.user_address,
+        "amount": pending_request.burn_request.amount,
+        "xmr_destination": pending_request.burn_request.xmr_destination,
+        "evm_height": pending_request.burn_request.evm_height,
+        "attempts": pending_request.attempts,
+        "last_error": pending_request.last_error,
+    }
+
+    # Check if request already exists (by burn_tx_hash)
+    existing = any(item["burn_tx_hash"] == new_request["burn_tx_hash"] for item in data)
+
+    if not existing:
+        data.append(new_request)
+        data_file.write_text(json.dumps(data, indent=2))
+
+
+def remove_pending_burn_request(pending_request: PendingXmrBurnRequest) -> None:
+    """Remove a pending XMR burn request from the tracking file."""
+    data_file = Path("data/pending_burn_requests.json")
+
+    if not data_file.exists():
+        return
+
+    data: list[PendingBurnRequestDict] = json.loads(data_file.read_text())
+
+    # Remove the request
+    data = [
+        item
+        for item in data
+        if item["burn_tx_hash"] != pending_request.burn_request.burn_tx_hash
+    ]
+
+    data_file.write_text(json.dumps(data, indent=2))
+
+
 def mint_w_xmr(
     contract: Contract, w3: Web3, amount: XmrAmount, tx_secret: XmrTxKey
 ) -> None:
@@ -663,7 +854,18 @@ def process_revealed_txs(contract: Contract, w3: Web3) -> None:
     set_min_block_height(confirmed_block)
 
 
-# TODO burn stuff
+def process_burn_requests(contract: Contract, w3: Web3) -> None:
+    """Process burn requests from the wXMR contract and send XMR to users."""
+    # TODO: This function will be implemented once the burn event is added to the contract
+    # For now, just log that it's being called
+    logger.debug("Processing burn requests (not yet implemented)")
+
+    # When implemented, this function will:
+    # 1. Get burn events from the contract logs
+    # 2. Filter out already processed burns
+    # 3. Attempt to send XMR to the destination addresses
+    # 4. Track successful and failed transfers
+    # 5. Retry failed transfers with exponential backoff
 
 
 async def main() -> None:
@@ -691,6 +893,7 @@ async def main() -> None:
         logger.info("Current ETH balance: %s ETH", balance_eth)
 
         process_revealed_txs(w_xmr_contract, w3)
+        process_burn_requests(w_xmr_contract, w3)
         await asyncio.sleep(1)
 
 
