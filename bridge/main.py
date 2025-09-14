@@ -1,4 +1,113 @@
 #!/usr/bin/env -S uv run
+"""
+XMR to wXMR Bridge
+
+This bridge has two main functions:
+
+1. Mint wXMR and accepting XMR when receiving wXMR mint requests
+2. Burn wXMR and transfer XMR to receiver address when receiving wXMR burn request.
+
+   -------->NETWORK VIEW<-----------
+
+     .------------.               .--------.
+     |XMR Stagenet|               |Ethereum|
+     .------+-----.               |Sepolia |
+            |                     .-----+--.
+            |                           |
+        .---+----.                .-----+-------.
+        |XMR Node|    .-----------+Ethereum Node|
+        .---+----.    |           .-------------.
+            |         |
+        .---+--.      |
+        |Bridge+------+
+        .------.
+
+     ----->LOGICAL VIEW (mint)<------------
+
+
+                          (1) Send XMR
+                      .------------------.
+                      v                  |
+                  .------.             .-------------.
+            .-----+Bridge|     .-------+XMR Depositor|
+            |     .------.     |       .-------------.
+            |           ^      |
+       (4)  |      (3)  |      |
+      Mint  |  Request  |      | (2) Request
+      wXMR  |     Mint  |      |     Mint
+            |    Event  |      |
+            |           |      |
+            |           |      |
+            |           |      |
+            |           |      v
+            |    .----+---------.
+            .--->|wXMR Contract |      wXMR holder
+                 .--------------.
+
+     ----->LOGICAL VIEW (burn)<------------
+
+
+                          (4) Send XMR
+                      .------------------.
+                      |                  v
+                  .------.             .-------------.
+            .-----+Bridge|     .-------+XMR Depositor|
+            |     .------.     |       .-------------.
+            |           ^      |
+       (3)  |      (2)  |      |
+      Burn  |  Request  |      | (1) Request
+      wXMR  |     Burn  |      |     Burn
+            |    Event  |      |
+            |           |      |
+            |           |      |
+            |           |      |
+            |           |      v
+            |    .----+---------.
+            .--->|wXMR Contract |      wXMR holder
+                 .--------------.
+
+---->Description of minting algorithm<----
+
+For minting transactions, we distinguish between the following mint requests:
+
+1. Mint requests with no matching XMR deposit
+2. Mint requests with a matching XMR deposit
+3. Mint requests that the bridge has already minted wXMR for
+
+To avoid querying the state of the Ethereum (or EVM) node for event logs
+continuously, the bridge caches mint requests. In the code, their variable name
+is `pending_mint_requests`. Mint requests that the bridge pulls out of the event
+logs are `log_requests`.
+
+Once the bridge has handled a request, it puts these in a separate cache and
+in a variable called `processed_requests`. All the bridge has to do then is
+to filter out mint requests with no matching XMR deposit and those
+that it has already minted wXMR for. It puts these new requests in a variable
+called `confirmed_requests`.
+
+Once these mint requests have their matching wXMR minted, these fully
+processed mint requests then move to `minted_requests`. Finally, the bridge
+updates its minimimum block height for EVM event logs to match the
+most recently handled event log's block height. Doing so, the bridge avoids
+fetching old event logs.
+
+Interesting edge cases not handled:
+
+1. Any crash while handling mint requests before marking them as `minted`.
+2. Accidentally handling the same mint request twice
+3. Running out of gas
+4. Miscalculation of required gas and gas limit
+
+The wXMR contract prevents the bridge from minting wXMR for the same request
+twice. Every `confirmMint` (the ABI function name for fulfilling a mint request)
+requires the bridge to pass the XMR transaction secret. Once the bridge
+confirms the mint, the wXMR marks this particular mint request as done.
+If the bridge then tries to confirm this mint a second time, the transaction
+will revert.
+
+This may lead to the bridge wasting gas fees on a transaction that does not
+do anything productive.
+"""
 import json
 from dataclasses import dataclass
 import asyncio

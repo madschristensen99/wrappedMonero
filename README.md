@@ -2,6 +2,12 @@
 
 A privacy-focused bridge between Monero (XMR) and Ethereum, featuring encrypted balances using Fhenix's Fully Homomorphic Encryption (FHE).
 
+**Note**: This is a demo for a very complex application. We have developed
+Wrapped Monero
+for evaluation on the Monero stagenet and the Ethereum Sepolia testnet. Please
+do not use any sensitive private keys or other confidential data with this
+application.
+
 ## Overview
 
 WXMR (Wrapped Monero) is a privacy-preserving ERC20 token that represents Monero on Ethereum. Key features:
