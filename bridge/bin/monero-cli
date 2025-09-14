@@ -1,0 +1,4 @@
+#!/usr/bin/env sh
+set -e
+rpc_endpoint=stagenet.xmr-tw.org:38081
+exec monero-wallet-cli --daemon-address "$rpc_endpoint" --stagenet --wallet-file $HOME/Monero/wallets/test_user_wallet --password ""
