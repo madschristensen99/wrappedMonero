@@ -31,44 +31,9 @@ The system consists of three main components:
    - MetaMask integration
    - Transfer, mint, and burn functionality
    - Real-time balance updates
-
-## Getting Started
-
-### Prerequisites
-
-- Node.js and npm for frontend and contract development
-- Python 3.8+ with `uv` package manager for the bridge service
-- Access to Monero and Ethereum (Sepolia) nodes
-- MetaMask wallet
-
-### Environment Setup
-
-1. Create `.env` file in the root directory:
-```env
-ETH_PRIVATE_KEY=your_ethereum_private_key
-XMR_RECEIVE_ADDRESS=your_monero_address
-W_XMR_CONTRACT_ADDRESS=deployed_contract_address
-```
-
-2. Create `.env` file in the `bridge/` directory with the same variables.
-
-### Running the Bridge
-
-```bash
-cd bridge
-uv venv
-source .venv/bin/activate
-uv pip install -r requirements.txt
-python main.py
-```
-
-### Running the Frontend
-
-```bash
-cd frontend
-npm install
-npm start
-```
+   - 
+ ## Deployed Contract Address
+[0x25305b62299562197582eB87443B64B894685Fb4](https://sepolia.etherscan.io/address/0x25305b62299562197582eB87443B64B894685Fb4)
 
 ## Usage
 
@@ -101,24 +66,6 @@ npm start
 - Monero transaction key verification
 - Multisig support for administrative functions
 
-## Development
-
-### Smart Contract Development
-
-```bash
-cd contract
-npm install
-npx hardhat compile
-npx hardhat test
-```
-
-### Frontend Development
-
-```bash
-cd frontend
-npm install
-npm run dev
-```
 
 ## License
 
