@@ -2,11 +2,11 @@
 *Post-quantum, zero-knowledge, privacy-preserving bridge for wrapping Monero as ERC-20 tokens*
 
 ## 🎯 **Deployed Contract Address**
-```
+
 **wxMR Token Contract:**  
 [0x5A8Bde0AE3F9871e509264E9152B77841EfE10c5](https://sepolia-explorer.base.org/address/0x5A8Bde0AE3F9871e509264E9152B77841EfE10c5)  
 *Network:* Base Sepolia Testnet
-```
+
 ---
 
 ## 🧠 **What This Thing Actually Does**
