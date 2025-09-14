@@ -26,7 +26,6 @@ EVM_SEPOLIA_API = "https://sepolia.gateway.tenderly.co"
 EVM_REQUIRED_CONFIRMATIONS = 1
 
 # monero cli RPC API connection info
-# https://monero.fail/?chain=monero&network=stagenet
 MONERO_STAGENET_API = "http://localhost:38081"
 # Completely arbitrary
 MONERO_REQUIRED_CONFIRMATIONS = 1

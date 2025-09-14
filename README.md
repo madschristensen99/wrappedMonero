@@ -31,11 +31,33 @@ The system consists of three main components:
    - MetaMask integration
    - Transfer, mint, and burn functionality
    - Real-time balance updates
-   - 
+   -
  ## Deployed Contract Address
 [0x25305b62299562197582eB87443B64B894685Fb4](https://sepolia.etherscan.io/address/0x25305b62299562197582eB87443B64B894685Fb4)
 
 ## Usage
+
+### How to demo
+
+Here's how to set up everything
+
+1. Install dependencies for bridge  by running `uv sync` inside
+   the `bridge/` directory.
+2. Install dependencies for the frontend by running `npm i` inside
+   the `frontend/` directory
+3. Install the monero cli tools and make sure that you have the
+   `monero-wallet-rpc` program available in your terminal.
+4. Create a Monero wallet that receives the XMR to be wrapped and make sure
+   that it's available in a directory that `monero-wallet-rpc` can access
+
+Here's how to start up everything
+
+1. Start the monero wallet rpc endpoint by running `bridge/bin/monero-cli`
+1. Start bridge by running `uv run ./main.py` inside the `bridge/` directory.
+2. Start the frontend by running `npm run dev` inside the `frontend/`
+   directory.
+
+
 
 ### Wrapping XMR to WXMR
 

@@ -1,4 +1,17 @@
 #!/usr/bin/env sh
+# This script starts up a Monero wallet CLI that you can use to send transactions
+# The script assumes that your wallet password is empty
 set -e
+
+# Find endpoints here
+# https://monero.fail/?chain=monero&network=stagenet
 rpc_endpoint=stagenet.xmr-tw.org:38081
-exec monero-wallet-cli --daemon-address "$rpc_endpoint" --stagenet --wallet-file $HOME/Monero/wallets/test_user_wallet --password ""
+# Point this to the wallet that you use to send XMR to the bridge to test the
+# wrapping process
+wallet_file=$HOME/Monero/wallets/test_user_wallet
+
+exec monero-wallet-cli \
+    --stagenet \
+    --daemon-address "$rpc_endpoint" \
+    --wallet-file "$wallet_file" \
+    --password ""
