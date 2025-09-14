@@ -28,20 +28,18 @@ def request_mint():
     contract = w3.eth.contract(address=W_XMR_CONTRACT_ADDRESS, abi=w_xmr_contract_abi)
 
     # Interactive input for transaction ID and secret
-    print("\nPlease provide the Monero transaction details:")
+    logger.info("Please provide the Monero transaction details:")
 
     while True:
         try:
             tx_id_input = input("Enter transaction ID (64 hex characters): ").strip()
             if len(tx_id_input) != 64:
-                print("Error: Transaction ID must be exactly 64 hex characters")
+                logger.error("Transaction ID must be exactly 64 hex characters")
                 continue
             tx_id = bytes.fromhex(tx_id_input)
             break
         except ValueError:
-            print(
-                "Error: Invalid hex format. Please enter only hex characters (0-9, a-f)"
-            )
+            logger.error("Invalid hex format. Please enter only hex characters (0-9, a-f)")
 
     while True:
         try:
@@ -49,14 +47,12 @@ def request_mint():
                 "Enter transaction secret/key (64 hex characters): "
             ).strip()
             if len(tx_secret_input) != 64:
-                print("Error: Transaction secret must be exactly 64 hex characters")
+                logger.error("Transaction secret must be exactly 64 hex characters")
                 continue
             tx_secret = bytes.fromhex(tx_secret_input)
             break
         except ValueError:
-            print(
-                "Error: Invalid hex format. Please enter only hex characters (0-9, a-f)"
-            )
+            logger.error("Invalid hex format. Please enter only hex characters (0-9, a-f)")
 
     # Optional: ask for receiver address (default to current account)
     receiver_input = input(
@@ -66,7 +62,7 @@ def request_mint():
         try:
             receiver = w3.to_checksum_address(receiver_input)
         except ValueError:
-            print(f"Invalid address format, using default: {account.address}")
+            logger.warning("Invalid address format, using default: %s", account.address)
             receiver = account.address
     else:
         receiver = account.address
@@ -133,19 +129,19 @@ def request_mint():
                 tx_hash.hex(),
                 receipt["blockNumber"],
             )
-            print(f"\n✅ Mint request submitted successfully!")
-            print(f"Transaction hash: {tx_hash.hex()}")
-            print(f"Block number: {receipt['blockNumber']}")
+            logger.info("✅ Mint request submitted successfully!")
+            logger.info("Transaction hash: %s", tx_hash.hex())
+            logger.info("Block number: %d", receipt['blockNumber'])
         else:
             logger.error(
                 "Transaction %s failed with status %d", tx_hash.hex(), receipt["status"]
             )
-            print(f"\n❌ Transaction failed!")
+            logger.error("❌ Transaction failed!")
     except Exception as e:
         logger.error(
             "Error waiting for transaction %s confirmation: %s", tx_hash.hex(), e
         )
-        print(f"\n⚠️  Transaction sent but confirmation failed: {e}")
+        logger.warning("⚠️  Transaction sent but confirmation failed: %s", e)
 
 
 if __name__ == "__main__":
