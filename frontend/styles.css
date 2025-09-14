@@ -17,7 +17,9 @@
 }
 
 body {
-    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+    font-family:
+        -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
+        "Helvetica Neue", Arial, sans-serif;
     background-color: var(--background-color);
     color: var(--text-color);
     line-height: 1.6;
@@ -32,7 +34,11 @@ body {
 header {
     text-align: center;
     padding: 40px 0;
-    background: linear-gradient(135deg, var(--primary-color), var(--secondary-color));
+    background: linear-gradient(
+        135deg,
+        var(--primary-color),
+        var(--secondary-color)
+    );
     color: white;
     border-radius: 10px;
     margin-bottom: 30px;
@@ -68,7 +74,7 @@ header p {
 
 .wallet-info p {
     margin: 5px 0;
-    font-family: 'Courier New', monospace;
+    font-family: "Courier New", monospace;
 }
 
 .btn {
@@ -175,7 +181,7 @@ header p {
 .balance-display span {
     color: var(--primary-color);
     font-weight: 700;
-    font-family: 'Courier New', monospace;
+    font-family: "Courier New", monospace;
 }
 
 .form-group {
@@ -204,7 +210,8 @@ header p {
     box-shadow: 0 0 0 0.2rem rgba(0, 102, 204, 0.25);
 }
 
-.admin-section h4, .admin-section h5 {
+.admin-section h4,
+.admin-section h5 {
     margin: 20px 0 10px 0;
     color: var(--primary-color);
 }
@@ -246,11 +253,16 @@ header p {
 }
 
 @keyframes spin {
-    0% { transform: rotate(0deg); }
-    100% { transform: rotate(360deg); }
+    0% {
+        transform: rotate(0deg);
+    }
+    100% {
+        transform: rotate(360deg);
+    }
 }
 
-.error-message, .success-message {
+.error-message,
+.success-message {
     position: fixed;
     top: 20px;
     right: 20px;
@@ -274,7 +286,8 @@ header p {
     background-color: var(--success-color);
 }
 
-.error-message button, .success-message button {
+.error-message button,
+.success-message button {
     background: none;
     border: none;
     color: white;
@@ -288,26 +301,27 @@ header p {
     .container {
         padding: 15px;
     }
-    
+
     header h1 {
         font-size: 2rem;
     }
-    
+
     .tabs {
         flex-direction: column;
     }
-    
+
     .tab-btn {
         border-right: none;
         border-bottom: 1px solid var(--border-color);
     }
-    
+
     .btn {
         width: 100%;
         margin: 5px 0;
     }
-    
-    .error-message, .success-message {
+
+    .error-message,
+    .success-message {
         left: 10px;
         right: 10px;
         top: 10px;
@@ -318,9 +332,23 @@ header p {
     .wallet-info p {
         font-size: 0.9rem;
     }
-    
+
     .form-group input {
         font-size: 16px; /* Prevents zoom on iOS */
+    }
+
+    .address-display {
+        flex-direction: column;
+        align-items: stretch;
+    }
+
+    .address-display code {
+        min-width: auto;
+        font-size: 0.8rem;
+    }
+
+    .copy-btn {
+        width: 100%;
     }
 }
 
@@ -337,4 +365,63 @@ input[type="number"]::-webkit-inner-spin-button {
 
 input[type="number"] {
     -moz-appearance: textfield;
+}
+
+.bridge-address {
+    background: #e8f4fd;
+    border: 2px solid var(--primary-color);
+    padding: 20px;
+    border-radius: 8px;
+    margin-bottom: 20px;
+}
+
+.bridge-address h4 {
+    margin-bottom: 10px;
+    color: var(--primary-color);
+    font-weight: 600;
+}
+
+.address-display {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: wrap;
+}
+
+.address-display code {
+    background: white;
+    padding: 10px;
+    border-radius: 6px;
+    font-family: "Courier New", monospace;
+    font-size: 0.9rem;
+    word-break: break-all;
+    flex: 1;
+    min-width: 300px;
+    border: 1px solid var(--border-color);
+}
+
+.copy-btn {
+    padding: 8px 16px;
+    font-size: 0.9rem;
+    white-space: nowrap;
+}
+
+.mint-info {
+    background: #f8f9fa;
+    padding: 15px;
+    border-radius: 8px;
+    margin-top: 20px;
+}
+
+.mint-info h4 {
+    margin-bottom: 10px;
+    color: var(--primary-color);
+}
+
+.mint-info ol {
+    margin-left: 20px;
+}
+
+.mint-info li {
+    margin-bottom: 5px;
 }

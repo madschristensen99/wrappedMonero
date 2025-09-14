@@ -1,106 +1,279 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Wrapped Monero (WXMR) Interface</title>
-    <link rel="stylesheet" href="styles.css">
-</head>
-<body>
-    <div class="container">
-        <header>
-            <h1>Wrapped Monero (WXMR)</h1>
-            <p>Encrypted balances via Fhenix FHE</p>
-        </header>
+    <head>
+        <meta charset="UTF-8" />
+        <meta
+            name="viewport"
+            content="width=device-width, initial-scale=1.0"
+        />
+        <title>Wrapped Monero (WXMR) Interface</title>
+        <link rel="stylesheet" href="styles.css" />
+    </head>
+    <body>
+        <div class="container">
+            <header>
+                <h1>Wrapped Monero (WXMR)</h1>
+                <p>Encrypted balances via Fhenix FHE</p>
+            </header>
 
-        <div class="wallet-section">
-            <h2>Connect Wallet</h2>
-            <button id="connectWallet" class="btn btn-primary">Connect MetaMask</button>
-            <div id="walletInfo" class="wallet-info" style="display: none;">
-                <p><strong>Connected:</strong> <span id="walletAddress"></span></p>
-                <p><strong>Network:</strong> <span id="networkName"></span></p>
-            </div>
-        </div>
-
-        <div class="tabs">
-            <button class="tab-btn active" data-tab="balance">My Balance</button>
-            <button class="tab-btn" data-tab="transfer">Transfer</button>
-            <button class="tab-btn" data-tab="admin">Admin</button>
-        </div>
-
-        <div id="balance-tab" class="tab-content active">
-            <h3>My WXMR Balance</h3>
-            <div class="balance-display">
-                <p><strong>Balance:</strong> <span id="balance">-</span> WXMR</p>
-                <p><strong>Total Supply:</strong> <span id="totalSupply">-</span> WXMR</p>
-            </div>
-            <button id="refreshBalance" class="btn btn-secondary">Refresh Balance</button>
-        </div>
-
-        <div id="transfer-tab" class="tab-content">
-            <h3>Transfer WXMR</h3>
-            <form id="transferForm">
-                <div class="form-group">
-                    <label for="recipient">Recipient Address:</label>
-                    <input type="text" id="recipient" placeholder="0x..." required>
+            <div class="wallet-section">
+                <h2>Connect Wallet</h2>
+                <button id="connectWallet" class="btn btn-primary">
+                    Connect MetaMask
+                </button>
+                <div id="walletInfo" class="wallet-info" style="display: none">
+                    <p>
+                        <strong>Connected:</strong>
+                        <span id="walletAddress"></span>
+                    </p>
+                    <p>
+                        <strong>Network:</strong>
+                        <span id="networkName"></span>
+                    </p>
                 </div>
-                <div class="form-group">
-                    <label for="amount">Amount:</label>
-                    <input type="number" id="amount" placeholder="0.0" min="0" step="0.000001" required>
-                </div>
-                <button type="submit" class="btn btn-primary">Transfer</button>
-            </form>
-        </div>
+            </div>
 
-        <div id="admin-tab" class="tab-content">
-            <h3>Admin Functions</h3>
-            <div class="admin-section">
-                <h4>Decrypt Cache Functions</h4>
-                <button id="decryptTotalSupply" class="btn btn-secondary">Decrypt Total Supply</button>
-                <button id="decryptBalance" class="btn btn-secondary">Decrypt My Balance</button>
-                
-                <h4>Mint & Burn (Multisig Required)</h4>
-                <div class="form-group">
-                    <h5>Mint Tokens</h5>
-                    <input type="text" id="mintAddress" placeholder="Recipient Address" required>
-                    <input type="number" id="mintAmount" placeholder="Amount" min="0" step="0.000001" required>
-                    <div id="mintSignatures">
-                        <input type="text" id="mintV" placeholder="v signatures (comma separated)" required>
-                        <input type="text" id="mintR" placeholder="r signatures (comma separated)" required>
-                        <input type="text" id="mintS" placeholder="s signatures (comma separated)" required>
+            <div class="tabs">
+                <button class="tab-btn active" data-tab="balance">
+                    My Balance
+                </button>
+                <button class="tab-btn" data-tab="transfer">Transfer</button>
+                <button class="tab-btn" data-tab="mint">Mint</button>
+                <button class="tab-btn" data-tab="admin">Admin</button>
+            </div>
+
+            <div id="balance-tab" class="tab-content active">
+                <h3>My WXMR Balance</h3>
+                <div class="balance-display">
+                    <p>
+                        <strong>Balance:</strong>
+                        <span id="balance">-</span> WXMR
+                    </p>
+                    <p>
+                        <strong>Total Supply:</strong>
+                        <span id="totalSupply">-</span> WXMR
+                    </p>
+                </div>
+                <button id="refreshBalance" class="btn btn-secondary">
+                    Refresh Balance
+                </button>
+            </div>
+
+            <div id="transfer-tab" class="tab-content">
+                <h3>Transfer WXMR</h3>
+                <form id="transferForm">
+                    <div class="form-group">
+                        <label for="recipient">Recipient Address:</label>
+                        <input
+                            type="text"
+                            id="recipient"
+                            placeholder="0x..."
+                            required
+                        />
                     </div>
-                    <button id="mintBtn" class="btn btn-primary">Mint</button>
+                    <div class="form-group">
+                        <label for="amount">Amount:</label>
+                        <input
+                            type="number"
+                            id="amount"
+                            placeholder="0.0"
+                            min="0"
+                            step="0.000001"
+                            required
+                        />
+                    </div>
+                    <button type="submit" class="btn btn-primary">
+                        Transfer
+                    </button>
+                </form>
+            </div>
+
+            <div id="mint-tab" class="tab-content">
+                <h3>Request Mint</h3>
+                <p>
+                    Request minting of WXMR tokens by providing Monero
+                    transaction details.
+                </p>
+
+                <div class="bridge-address">
+                    <h4>Bridge Monero Address:</h4>
+                    <div class="address-display">
+                        <code
+                            >74Di3cYaTj7DG5D7ucHEeiSZzrH9kyrFX8ujg2S3ydoZQEkKhpFjGkGLcpenYEHMW1aYNQcy6n75MbDfFwch4657E8WjVhE</code
+                        >
+                        <button
+                            onclick="navigator.clipboard.writeText('74Di3cYaTj7DG5D7ucHEeiSZzrH9kyrFX8ujg2S3ydoZQEkKhpFjGkGLcpenYEHMW1aYNQcy6n75MbDfFwch4657E8WjVhE')"
+                            class="btn btn-secondary copy-btn"
+                        >
+                            Copy
+                        </button>
+                    </div>
                 </div>
 
-                <div class="form-group">
-                    <h5>Burn Tokens</h5>
-                    <input type="number" id="burnAmount" placeholder="Amount to Burn" min="0" step="0.000001" required>
-                    <div id="burnSignatures">
-                        <input type="text" id="burnV" placeholder="v signatures (comma separated)" required>
-                        <input type="text" id="burnR" placeholder="r signatures (comma separated)" required>
-                        <input type="text" id="burnS" placeholder="s signatures (comma separated)" required>
+                <form id="mintRequestForm">
+                    <div class="form-group">
+                        <label for="txId">Monero Transaction ID:</label>
+                        <input
+                            type="text"
+                            id="txId"
+                            placeholder="Monero txid (hex)"
+                            required
+                        />
                     </div>
-                    <button id="burnBtn" class="btn btn-primary">Burn</button>
+                    <div class="form-group">
+                        <label for="txSecret">Transaction Secret Key:</label>
+                        <input
+                            type="text"
+                            id="txSecret"
+                            placeholder="Transaction secret key (hex)"
+                            required
+                        />
+                    </div>
+                    <div class="form-group">
+                        <label for="receiverAddress">Receiver Address:</label>
+                        <input
+                            type="text"
+                            id="receiverAddress"
+                            placeholder="0x..."
+                            required
+                        />
+                        <button
+                            type="button"
+                            id="useCurrentWallet"
+                            class="btn btn-secondary"
+                        >
+                            Send to current wallet address
+                        </button>
+                    </div>
+                    <button type="submit" class="btn btn-primary">
+                        Request Mint
+                    </button>
+                </form>
+
+                <div class="mint-info">
+                    <h4>How it works:</h4>
+                    <ol>
+                        <li>Send Monero to the bridge address above</li>
+                        <li>
+                            Get the transaction ID and secret key from your
+                            Monero wallet
+                        </li>
+                        <li>Submit a mint request with these details</li>
+                        <li>The bridge will verify and mint WXMR tokens</li>
+                    </ol>
                 </div>
+            </div>
+
+            <div id="admin-tab" class="tab-content">
+                <h3>Admin Functions</h3>
+                <div class="admin-section">
+                    <h4>Decrypt Cache Functions</h4>
+                    <button id="decryptTotalSupply" class="btn btn-secondary">
+                        Decrypt Total Supply
+                    </button>
+                    <button id="decryptBalance" class="btn btn-secondary">
+                        Decrypt My Balance
+                    </button>
+
+                    <h4>Mint & Burn (Multisig Required)</h4>
+                    <div class="form-group">
+                        <h5>Mint Tokens</h5>
+                        <input
+                            type="text"
+                            id="mintAddress"
+                            placeholder="Recipient Address"
+                            required
+                        />
+                        <input
+                            type="number"
+                            id="mintAmount"
+                            placeholder="Amount"
+                            min="0"
+                            step="0.000001"
+                            required
+                        />
+                        <div id="mintSignatures">
+                            <input
+                                type="text"
+                                id="mintV"
+                                placeholder="v signatures (comma separated)"
+                                required
+                            />
+                            <input
+                                type="text"
+                                id="mintR"
+                                placeholder="r signatures (comma separated)"
+                                required
+                            />
+                            <input
+                                type="text"
+                                id="mintS"
+                                placeholder="s signatures (comma separated)"
+                                required
+                            />
+                        </div>
+                        <button id="mintBtn" class="btn btn-primary">
+                            Mint
+                        </button>
+                    </div>
+
+                    <div class="form-group">
+                        <h5>Burn Tokens</h5>
+                        <input
+                            type="number"
+                            id="burnAmount"
+                            placeholder="Amount to Burn"
+                            min="0"
+                            step="0.000001"
+                            required
+                        />
+                        <div id="burnSignatures">
+                            <input
+                                type="text"
+                                id="burnV"
+                                placeholder="v signatures (comma separated)"
+                                required
+                            />
+                            <input
+                                type="text"
+                                id="burnR"
+                                placeholder="r signatures (comma separated)"
+                                required
+                            />
+                            <input
+                                type="text"
+                                id="burnS"
+                                placeholder="s signatures (comma separated)"
+                                required
+                            />
+                        </div>
+                        <button id="burnBtn" class="btn btn-primary">
+                            Burn
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <div id="loading" class="loading" style="display: none">
+                <div class="spinner"></div>
+                <p>Processing transaction...</p>
+            </div>
+
+            <div id="error" class="error-message" style="display: none">
+                <span id="errorText"></span>
+                <button onclick="this.parentElement.style.display='none'">
+                    ×
+                </button>
+            </div>
+
+            <div id="success" class="success-message" style="display: none">
+                <span id="successText"></span>
+                <button onclick="this.parentElement.style.display='none'">
+                    ×
+                </button>
             </div>
         </div>
 
-        <div id="loading" class="loading" style="display: none;">
-            <div class="spinner"></div>
-            <p>Processing transaction...</p>
-        </div>
-
-        <div id="error" class="error-message" style="display: none;">
-            <span id="errorText"></span>
-            <button onclick="this.parentElement.style.display='none'">×</button>
-        </div>
-
-        <div id="success" class="success-message" style="display: none;">
-            <span id="successText"></span>
-            <button onclick="this.parentElement.style.display='none'">×</button>
-        </div>
-    </div>
-
-    <script type="module" src="app.js"></script>
-</body>
+        <script type="module" src="app.js"></script>
+    </body>
 </html>
