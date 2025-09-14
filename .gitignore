@@ -49,3 +49,7 @@ fhe_keys/
 # Logs
 *.log
 logs/
+
+# Bridge
+bridge/data
+bridge/.env
