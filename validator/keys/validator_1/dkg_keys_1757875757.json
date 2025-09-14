@@ -1,0 +1,16 @@
+{
+  "public_key": "027d4c3eb73151f2453629a8d0bd8586625199d1af030b2c68a15027a9e92ac46e",
+  "chain_code": "769c1f0fdc982a5e6e0f6ad59d04f569751871ecdf3e3234da0f8e8f1ee36b45",
+  "threshold": 4,
+  "total_parties": 7,
+  "validator_id": 1,
+  "shares": [
+    217,
+    90,
+    49,
+    207,
+    223,
+    68,
+    41
+  ]
+}

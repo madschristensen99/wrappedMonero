@@ -1,0 +1,6 @@
+=== CROSS-CHAIN VALIDATOR 3 ===
+EVM Bridge: 0x5c43220e24daaeb7d2f8838cbc1f8af72c32cc5c
+Monero Spend: a8abc143e05c0bd0
+Monero View: 3b06254e17462444
+Threshold: 4 of 7
+File: ./keys/validator_3/dkg_keys_1757876216.json

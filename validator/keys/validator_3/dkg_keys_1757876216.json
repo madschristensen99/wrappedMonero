@@ -1,0 +1,23 @@
+{
+  "evm_private_key": "962ee590bc3c4b5b4386480c326f4f8f3369e0656c8a7b7cbd416a346f5747f8",
+  "evm_public_key": "022c739480e1696e35ffab27e2378c9443f274aa0480dcc91642b006ab1326e574",
+  "evm_address": "0x5c43220e24daaeb7d2f8838cbc1f8af72c32cc5c",
+  "monero_spend_private_key": "70c37b3d81deb16d25ad5cb7349eebe9117a749c62153461b213c049d550683f",
+  "monero_spend_public_key": "a8abc143e05c0bd0ae193e98d8d954e04bb25be720a3bd54c6a35f8e4a1f7386",
+  "monero_view_private_key": "8d09b00bf03dc11c491447228207c971b3b9e1ace3eab7780251fff9cf2fc2a2",
+  "monero_view_public_key": "3b06254e1746244413b7873b963708ef0cb7acca926b67f4ad90a039b02dd6fc",
+  "threshold": 4,
+  "total_parties": 7,
+  "validator_id": 3,
+  "shares": [
+    131,
+    237,
+    14,
+    163,
+    78,
+    174,
+    228
+  ],
+  "network_seed": "d7d7d00d7937e916664da9f106b709ed663d9157d8c688283bb9c721dbed36b8",
+  "generated_at": 1757876216
+}

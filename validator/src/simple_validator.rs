@@ -1,6 +1,6 @@
 // Simplified validator demo that actually runs
 use axum::{
-    routing::get,
+    routing::{get, post},
     Router,
     response::Json,
     extract::Path,
@@ -9,10 +9,7 @@ use rand::Rng;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
-use tokio::sync::broadcast;
-use tracing::{info, error};
-use k256::ecdsa::{SigningKey, Signature};
-use k256::Secp256k1;
+use tracing::info;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 struct ValidatorState {
@@ -76,10 +73,10 @@ async fn validator_health(
 
 async fn request_signature(
     Path(validator_id): Path<usize>,
-    state: axum::extract::State<(SharedState, SharedSignatures)>,
-    axum::extract::Json(request): axum::extract::Json<SignatureRequest>
-) -> Json<DemoSignResponse> {
-    let (state, signatures) = &*state;
+    state: axum::extract::State<SharedState>,
+    axum::extract::Json(_request): axum::extract::Json<SignatureRequest>
+) -> Json<ThresholdSignature> {
+    info!("Processing signature request for validator {}", validator_id);
     let ts = std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
         .unwrap()
@@ -98,13 +95,6 @@ async fn request_signature(
         timestamp: ts,
     };
     
-    // Store signature
-    let mut sigs_lock = signatures.lock().unwrap();
-    sigs_lock
-        .entry(request.tx_secret.clone())
-        .or_default()
-        .push(signature.clone());
-    
     // Update validator state
     let mut state_lock = state.lock().unwrap();
     if let Some(v) = state_lock.get_mut(&validator_id) {
@@ -112,35 +102,19 @@ async fn request_signature(
         v.last_signature_at = ts;
     }
     
-    let validator_health: Vec<_> = state_lock
-        .values()
-        .map(|v| (v.id, v.is_online))
-        .collect();
-    
-    Json(DemoSignResponse {
-        signature,
-        validator_health,
-    })
+    Json(signature)
 }
 
 async fn check_threshold_status(
-    signatures: SharedSignatures,
+    state: axum::extract::State<SharedState>,
 ) -> Json<serde_json::Value> {
-    let sigs_lock = signatures.lock().unwrap();
+    let state_lock = state.lock().unwrap();
     
-    let mut status = serde_json::Map::new();
-    for (tx_secret, sigs) in sigs_lock.iter() {
-        status.insert(
-            tx_secret.clone(), 
-            serde_json::json!({
-                "signatures": sigs.len(),
-                "threshold_met": sigs.len() >= 4,
-                "validators": sigs.iter().map(|s| s.validator_id).collect::<Vec<_>>()
-            })
-        );
-    }
-    
-    Json(serde_json::Value::Object(status))
+    Json(serde_json::json!({
+        "message": "This is a demo endpoint",
+        "threshold": 4,
+        "total_validators": state_lock.len()
+    }))
 }
 
 #[tokio::main]
@@ -171,14 +145,14 @@ async fn main() {
     }
     
     let state = Arc::new(Mutex::new(validators));
-    let signatures = Arc::new(Mutex::new(HashMap::new()));
+    let _signatures = Arc::new(Mutex::new(HashMap::<String, Vec<ThresholdSignature>>::new()));
     
     let app = Router::new()
         .route("/health", get(health_check))
         .route("/validators", get(validator_health))
-        .route("/sign/:validator_id", get(request_signature))
+        .route("/sign/:validator_id", post(request_signature))
         .route("/threshold-status", get(check_threshold_status))
-        .with_state((state, signatures));
+        .with_state(state.clone());
     
     let listener = tokio::net::TcpListener::bind(format!("0.0.0.0:{}", base_port))
         .await
