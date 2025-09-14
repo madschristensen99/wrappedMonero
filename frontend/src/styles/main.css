@@ -1,0 +1,9 @@
+/* Import all styles in order */
+@import url('variables.css');
+@import url('base.css');
+@import url('layout.css');
+@import url('components.css');
+@import url('wallet.css');
+@import url('tabs.css');
+@import url('messages.css');
+@import url('responsive.css');

@@ -28,11 +28,16 @@ __pycache__/
 .env.local
 .env.*.local
 
-# Keys and secrets
+# Keys and secrets - exclude all generated cryptographic material
 *.fhe
 keys.*
 *.key
 *.pem
+keys/
+dkg_keys_*.json
+mnemonic_*.txt
+key_*.json
+summary_*.txt
 
 # Docker volumes
 docker-compose.override.yml

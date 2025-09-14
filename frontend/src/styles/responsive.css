@@ -1,0 +1,169 @@
+/* Responsive Design */
+
+/* Mobile First Approach */
+
+/* Base styles for mobile */
+.container {
+  max-width: 100%;
+  padding: var(--spacing-sm);
+}
+
+/* Small tablets and up */
+@media (min-width: 576px) {
+  .container {
+    max-width: 540px;
+    padding: var(--spacing-md);
+  }
+}
+
+/* Medium tablets */
+@media (min-width: 768px) {
+  .container {
+    max-width: 720px;
+    padding: var(--spacing-lg);
+  }
+  
+  .grid--tablet-2 {
+    grid-template-columns: repeat(2, 1fr);
+  }
+  
+  .tabs__btn {
+    padding: var(--spacing-lg);
+    font-size: var(--font-size-base);
+  }
+  
+  .tab-content {
+    padding: var(--spacing-xl);
+  }
+}
+
+/* Large tablets and desktop */
+@media (min-width: 992px) {
+  .container {
+    max-width: 960px;
+  }
+  
+  .grid--desktop-3 {
+    grid-template-columns: repeat(3, 1fr);
+  }
+  
+  .grid--desktop-4 {
+    grid-template-columns: repeat(4, 1fr);
+  }
+}
+
+/* Extra large desktop */
+@media (min-width: 1200px) {
+  .container {
+    max-width: 1140px;
+  }
+  
+  .header__title {
+    font-size: 2.8rem;
+  }
+}
+
+/* Extra extra large desktop */
+@media (min-width: 1400px) {
+  .container {
+    max-width: 1320px;
+  }
+}
+
+/* Reduced motion */
+@media (prefers-reduced-motion: reduce) {
+  * {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+/* High contrast mode */
+@media (prefers-contrast: high) {
+  :root {
+    --primary-color: #004d99;
+    --secondary-color: #e04a1a;
+    --text-color: #000000;
+    --background-color: #ffffff;
+    --border-color: #000000;
+  }
+}
+
+/* Dark mode support */
+@media (prefers-color-scheme: dark) {
+  :root {
+    --background-color: #1a1a1a;
+    --card-background: #2d2d2d;
+    --text-color: #e0e0e0;
+    --border-color: #404040;
+  }
+}
+
+/* Touch targets for mobile */
+@media (max-width: 768px) {
+  .btn {
+    min-height: 44px;
+    min-width: 44px;
+  }
+  
+  .tabs__btn,
+  .form__input {
+    font-size: 16px; /* Prevent zoom on iOS */
+  }
+  
+  .toast {
+    left: var(--spacing-md);
+    right: var(--spacing-md);
+  }
+  
+  .grid {
+    grid-template-columns: 1fr;
+  }
+  
+  .form__group {
+    margin-bottom: var(--spacing-md);
+  }
+  
+  .card {
+    padding: var(--spacing-md);
+  }
+  
+  .section {
+    padding: var(--spacing-lg);
+  }
+  
+  .wallet__info {
+    padding: var(--spacing-md);
+  }
+  
+  .wallet__address {
+    font-size: var(--font-size-xs);
+  }
+}
+
+/* Print styles */
+@media print {
+  .toast,
+  .loading,
+  .message-overlay {
+    display: none !important;
+  }
+  
+  body {
+    background: white !important;
+    color: black !important;
+    font-size: 12pt;
+  }
+  
+  .btn {
+    background: none !important;
+    color: black !important;
+    border: 1px solid black !important;
+  }
+  
+  .card {
+    border: 1px solid black !important;
+    box-shadow: none !important;
+  }
+}

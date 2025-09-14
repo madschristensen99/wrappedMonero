@@ -1,0 +1,28 @@
+{
+  "name": "wrapped-monero-frontend",
+  "version": "1.0.0",
+  "description": "Frontend interface for Wrapped Monero (WXMR) with Fhenix FHE integration",
+  "main": "index.html",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "serve": "http-server dist -p 8080 -c-1"
+  },
+  "keywords": ["monero", "wrapped", "fhenix", "fhe", "privacy", "crypto", "web3"],
+  "author": "Wrapped Monero Team",
+  "license": "MIT",
+  "devDependencies": {
+    "vite": "^4.4.5",
+    "http-server": "^14.1.1"
+  },
+  "dependencies": {
+    "ethers": "^5.7.2"
+  },
+  "browserslist": [
+    "> 1%",
+    "last 2 versions",
+    "not dead"
+  ]
+}
