@@ -5,18 +5,17 @@ import {ERC20} from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import {FHE, euint64} from "@fhenixprotocol/cofhe-contracts/FHE.sol";
 
 /**
- * @title  Wrapped Monero (WXMR) – encrypted balances, 3-of-3 multisig confirmMint
- * @notice Two-step mint:
+ * @title  Wrapped Monero (WXMR) – encrypted balances
+ * @notice Single authority: 0x37fD7F8e2865EF6F214D21C261833d6831D8205e
+ *         Two-step mint:
  *            1. user: requestMint(txSecret, receiver)
- *            2. operators: confirmMint(txSecret, amount, 3 sigs)
+ *            2. authority: confirmMint(txSecret, amount)
  */
 contract WrappedMonero is ERC20 {
     /* --------------------------------------------------------------------------
-                               IMMUTABLE SIGNERS
+                               AUTHORITY
     -------------------------------------------------------------------------- */
-    address private constant SIGNER_1 = 0x49a22328fecF3e43C4C0fEDfb7E5272248904E3E;
-    address private constant SIGNER_2 = 0xDFdC570ec0586D5c00735a2277c21Dcc254B3917;
-    address private constant SIGNER_3 = 0xf6Fe61C7b88eF0688B1b0A141D12e9B98dfE1cc4;
+    address public constant AUTHORITY = 0x37fD7F8e2865EF6F214D21C261833d6831D8205e;
 
     /* --------------------------------------------------------------------------
                                ENCRYPTED STORAGE
@@ -35,15 +34,6 @@ contract WrappedMonero is ERC20 {
     mapping(bytes32 => bool) public mintSecretUsed;        // txSecret => spent
 
     /* --------------------------------------------------------------------------
-                               OWNER
-    -------------------------------------------------------------------------- */
-    address private _owner;
-    modifier onlyOwner() {
-        require(msg.sender == _owner, "Ownable: caller is not the owner");
-        _;
-    }
-
-    /* --------------------------------------------------------------------------
                                  EVENTS
     -------------------------------------------------------------------------- */
     event MintRequested(bytes32 indexed txSecret, address indexed receiver);
@@ -54,29 +44,8 @@ contract WrappedMonero is ERC20 {
                                CONSTRUCTOR
     -------------------------------------------------------------------------- */
     constructor() ERC20("Wrapped Monero", "WXMR") {
-        _owner = msg.sender;
-
         _totalSupplyEnc = FHE.asEuint64(0);
         FHE.allowThis(_totalSupplyEnc);
-    }
-
-    /* --------------------------------------------------------------------------
-                              MULTISIG VERIFICATION
-    -------------------------------------------------------------------------- */
-    function _recover(
-        bytes32 txSecret,
-        uint64 amount,
-        uint256 nonce,
-        uint8 v,
-        bytes32 r,
-        bytes32 s
-    ) internal view returns (address) {
-        uint256 chainId;
-        assembly { chainId := chainid() }
-        bytes32 digest = keccak256(
-            abi.encodePacked("WrappedMonero-confirmMint", chainId, nonce, txSecret, amount)
-        );
-        return ecrecover(digest, v, r, s);
     }
 
     /* --------------------------------------------------------------------------
@@ -92,31 +61,16 @@ contract WrappedMonero is ERC20 {
     }
 
     /* --------------------------------------------------------------------------
-                           2. OPERATORS CONFIRM MINT
+                           2. AUTHORITY CONFIRMS MINT
     -------------------------------------------------------------------------- */
-    uint256 private _confirmNonce;
-
-    function confirmMint(
-        bytes32 txSecret,
-        uint64 amount,
-        uint8[3] calldata v,
-        bytes32[3] calldata r,
-        bytes32[3] calldata s
-    ) external {
+    function confirmMint(bytes32 txSecret, uint64 amount) external {
+        require(msg.sender == AUTHORITY, "Not authority");
         address receiver = mintRequestReceiver[txSecret];
         require(receiver != address(0), "Mint request not found");
         require(!mintSecretUsed[txSecret], "Secret already used");
 
-        uint256 nonce = _confirmNonce++;
-        require(
-            _recover(txSecret, amount, nonce, v[0], r[0], s[0]) == SIGNER_1 &&
-            _recover(txSecret, amount, nonce, v[1], r[1], s[1]) == SIGNER_2 &&
-            _recover(txSecret, amount, nonce, v[2], r[2], s[2]) == SIGNER_3,
-            "Invalid 3-of-3 multisig"
-        );
-
-        mintSecretUsed[txSecret] = true;           // mark spent
-        delete mintRequestReceiver[txSecret];      // clean up
+        mintSecretUsed[txSecret] = true;
+        delete mintRequestReceiver[txSecret];
 
         euint64 amtEnc = FHE.asEuint64(amount);
         _totalSupplyEnc = FHE.add(_totalSupplyEnc, amtEnc);
@@ -131,45 +85,17 @@ contract WrappedMonero is ERC20 {
     /* --------------------------------------------------------------------------
                                  BURN
     -------------------------------------------------------------------------- */
-    uint256 private _burnNonce;
-
-    function _recoverBurn(
-        uint64 amount,
-        uint256 nonce,
-        uint8 v,
-        bytes32 r,
-        bytes32 s
-    ) internal view returns (address) {
-        uint256 chainId;
-        assembly { chainId := chainid() }
-        bytes32 digest = keccak256(
-            abi.encodePacked("WrappedMonero-burn", chainId, nonce, msg.sender, amount)
-        );
-        return ecrecover(digest, v, r, s);
-    }
-
-    function burn(
-        uint64 amount,
-        uint8[3] calldata v,
-        bytes32[3] calldata r,
-        bytes32[3] calldata s
-    ) external {
-        uint256 nonce = _burnNonce++;
-        require(
-            _recoverBurn(amount, nonce, v[0], r[0], s[0]) == SIGNER_1 &&
-            _recoverBurn(amount, nonce, v[1], r[1], s[1]) == SIGNER_2 &&
-            _recoverBurn(amount, nonce, v[2], r[2], s[2]) == SIGNER_3,
-            "Invalid 3-of-3 multisig"
-        );
+    function burn(uint64 amount) external {
+        require(msg.sender == AUTHORITY, "Not authority");
 
         euint64 amtEnc = FHE.asEuint64(amount);
         _totalSupplyEnc = FHE.sub(_totalSupplyEnc, amtEnc);
-        _balancesEnc[msg.sender] = FHE.sub(_balancesEnc[msg.sender], amtEnc);
+        _balancesEnc[AUTHORITY] = FHE.sub(_balancesEnc[AUTHORITY], amtEnc);
 
         FHE.allowThis(_totalSupplyEnc);
-        FHE.allowThis(_balancesEnc[msg.sender]);
+        FHE.allowThis(_balancesEnc[AUTHORITY]);
 
-        emit Burn(msg.sender, amount);
+        emit Burn(AUTHORITY, amount);
     }
 
     /* --------------------------------------------------------------------------
@@ -188,14 +114,16 @@ contract WrappedMonero is ERC20 {
     }
 
     /* --------------------------------------------------------------------------
-                         OWNER-ONLY DECRYPT REFRESH
+                         AUTHORITY DECRYPT REFRESH
     -------------------------------------------------------------------------- */
-    function decryptTotalSupply() external onlyOwner {
+    function decryptTotalSupply() external {
+        require(msg.sender == AUTHORITY, "Not authority");
         _lastDecryptedSupply = _totalSupplyEnc;
         FHE.decrypt(_lastDecryptedSupply);
     }
 
-    function decryptBalance(address account) external onlyOwner {
+    function decryptBalance(address account) external {
+        require(msg.sender == AUTHORITY, "Not authority");
         _lastDecryptedBalance[account] = _balancesEnc[account];
         FHE.decrypt(_lastDecryptedBalance[account]);
     }
