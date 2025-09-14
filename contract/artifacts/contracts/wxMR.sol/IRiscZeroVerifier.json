@@ -16,9 +16,9 @@
           "type": "bytes32"
         },
         {
-          "internalType": "bytes",
-          "name": "journal",
-          "type": "bytes"
+          "internalType": "bytes32",
+          "name": "journalDigest",
+          "type": "bytes32"
         }
       ],
       "name": "verify",

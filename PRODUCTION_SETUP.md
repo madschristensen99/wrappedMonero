@@ -131,17 +131,18 @@ DATABASE_URL=sqlite:///path/to/database.db
 RELAY_API_URL=http://localhost:8080
 ```
 
-### Contract Verification ⚠️ **MUST REDEPLOY**
-**The contract was updated with real RISC Zero verifier but IS NOT DEPLOYED**
-- **Real RISC Zero verifier**: Ready but needs deployment
-- **Production image ID**: Built from actual guest program
-- **Status**: Contract ABI changed - requires redeployment
+### Contract Verification ✅ **COMPLETE**
+- **✅ Production Contract Address**: `0x0258fCD44d7F2579468D89111D2d6d4455903Fe7`
+- **✅ Real RISC Zero verifier**: Official IRiscZeroGroth16Verifier contract
+- **✅ Production image ID**: `0x8c7c3ed469b05e3336233d0d682245566d98f867af2856d0436145ba8f72e423`
+- **✅ Base Sepolia Network**: Production deployment complete
 
-## Redeployment Required
+## Usage (Ready for Production)
 ```bash
 cd contract
-npx hardhat run scripts/deploy.js --network sepolia
-# THEN update contract address in all configurations
+# Already deployed - use like this:
+npx hardhat run mint_operation.js --network baseSepolia
+# Or integrate with relay service
 ```
 
 ## Monitoring
