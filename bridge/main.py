@@ -1,12 +1,10 @@
 #!/usr/bin/env -S uv run
 import json
 from dataclasses import dataclass
-import os
 import asyncio
 from typing import Any, Optional, Union, NewType, TypedDict
 from pathlib import Path
 import requests
-import dotenv
 from requests.auth import HTTPDigestAuth
 
 from eth_typing import HexAddress, HexStr
@@ -17,7 +15,16 @@ import logging
 from web3.eth import Contract
 from web3.types import TxParams, Wei
 
-dotenv.load_dotenv()
+from lib import (
+    ETH_PRIVATE_KEY,
+    XMR_RECEIVE_ADDRESS,
+    W_XMR_CONTRACT_ADDRESS,
+    EVM_SEPOLIA_API,
+    EVM_REQUIRED_CONFIRMATIONS,
+    MONERO_STAGENET_API,
+    MONERO_REQUIRED_CONFIRMATIONS,
+    GAS_BUFFER_MULTIPLIER,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -30,30 +37,6 @@ XmrAmount = NewType("XmrAmount", int)
 # Ethereum types
 EvmHeight = NewType("EvmHeight", int)
 
-
-# EVM RPC API connection info
-# https://chainlist.org/chain/11155111
-EVM_SEPOLIA_API = "https://sepolia.gateway.tenderly.co"
-# Completely arbitrary
-EVM_REQUIRED_CONFIRMATIONS = 1
-
-# monero cli RPC API connection info
-# https://monero.fail/?chain=monero&network=stagenet
-MONERO_STAGENET_API = "http://localhost:38081"
-# Completely arbitrary
-MONERO_REQUIRED_CONFIRMATIONS = 6
-
-# Gas estimation buffer (20% extra)
-GAS_BUFFER_MULTIPLIER = 1.2
-
-ETH_PRIVATE_KEY = os.environ["ETH_PRIVATE_KEY"]
-
-
-# TODO
-XMR_RECEIVE_ADDRESS = XmrAddress(os.environ["XMR_RECEIVE_ADDRESS"])
-W_XMR_CONTRACT_ADDRESS = EvmAddress(
-    HexAddress(HexStr(os.environ["W_XMR_CONTRACT_ADDRESS"]))
-)
 
 # Contract ABI
 w_xmr_contract_abi = json.loads(Path("abi.json").read_text())
@@ -225,7 +208,12 @@ def test_monero_rpc_connection() -> None:
     version = result["version"]
     major = version >> 16
     minor = version & 0xFFFF
-    logger.info("Monero RPC connection to %s successful. Version: %d.%d", MONERO_STAGENET_API, major, minor)
+    logger.info(
+        "Monero RPC connection to %s successful. Version: %d.%d",
+        MONERO_STAGENET_API,
+        major,
+        minor,
+    )
 
 
 # https://docs.getmonero.org/rpc-library/wallet-rpc/#check_tx_key

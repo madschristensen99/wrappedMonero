@@ -5,10 +5,7 @@ from pathlib import Path
 from web3 import Web3
 import logging
 
-# Same constants as main.py
-EVM_SEPOLIA_API = "https://sepolia.gateway.tenderly.co"
-ETH_PRIVATE_KEY = "0x75d2d8289c7287622b22b76d604af040b0b3dcaa6894fcd768d7111354b07b0a"
-W_XMR_CONTRACT_ADDRESS = "0xb087C13f03b0b5A303d919cBF4D732b835AFE434"
+from lib import ETH_PRIVATE_KEY, W_XMR_CONTRACT_ADDRESS, EVM_SEPOLIA_API
 
 # Contract ABI
 w_xmr_contract_abi = json.loads(Path("abi.json").read_text())
