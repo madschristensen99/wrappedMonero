@@ -10,7 +10,13 @@ max_line_length = 79
 
 # Examples:
 # [filename] or
-[*.py] or
+[*.py]
+# [*.{ext1,ext2}] or
+# [folder/glob]
+indent_style = space
+indent_size = 4
+
+[*.{html,svelte,js,ts}]
 # [*.{ext1,ext2}] or
 # [folder/glob]
 indent_style = space
