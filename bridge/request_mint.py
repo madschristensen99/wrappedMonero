@@ -1,6 +1,5 @@
 #!/usr/bin/env -S uv run
 import json
-import secrets
 from pathlib import Path
 from web3 import Web3
 import logging
@@ -39,7 +38,9 @@ def request_mint():
             tx_id = bytes.fromhex(tx_id_input)
             break
         except ValueError:
-            logger.error("Invalid hex format. Please enter only hex characters (0-9, a-f)")
+            logger.error(
+                "Invalid hex format. Please enter only hex characters (0-9, a-f)"
+            )
 
     while True:
         try:
@@ -52,7 +53,9 @@ def request_mint():
             tx_secret = bytes.fromhex(tx_secret_input)
             break
         except ValueError:
-            logger.error("Invalid hex format. Please enter only hex characters (0-9, a-f)")
+            logger.error(
+                "Invalid hex format. Please enter only hex characters (0-9, a-f)"
+            )
 
     # Optional: ask for receiver address (default to current account)
     receiver_input = input(
@@ -131,7 +134,7 @@ def request_mint():
             )
             logger.info("✅ Mint request submitted successfully!")
             logger.info("Transaction hash: %s", tx_hash.hex())
-            logger.info("Block number: %d", receipt['blockNumber'])
+            logger.info("Block number: %d", receipt["blockNumber"])
         else:
             logger.error(
                 "Transaction %s failed with status %d", tx_hash.hex(), receipt["status"]

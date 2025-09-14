@@ -1,5 +1,7 @@
 import os
+
 import dotenv
+
 from eth_typing import HexAddress, HexStr
 from eth_typing.evm import ChecksumAddress as EvmAddress
 from typing import NewType

@@ -24,6 +24,7 @@ from lib import (
     MONERO_STAGENET_API,
     MONERO_REQUIRED_CONFIRMATIONS,
     GAS_BUFFER_MULTIPLIER,
+    XmrAddress,
 )
 
 logger = logging.getLogger(__name__)
@@ -31,7 +32,6 @@ logger = logging.getLogger(__name__)
 # Monero types
 XmrTxId = NewType("XmrTxId", bytes)
 XmrTxKey = NewType("XmrTxKey", bytes)
-XmrAddress = NewType("XmrAddress", str)
 XmrAmount = NewType("XmrAmount", int)
 
 # Ethereum types
@@ -88,6 +88,14 @@ class ConfirmedXmrMintRequest:
 
     mint_request: WXmrMintRequest
     xmr_confirmed: XmrConfirmed
+
+
+@dataclass(kw_only=True, frozen=True)
+class MoneroRpcError:
+    """Represents an error from the Monero RPC API."""
+
+    error_code: Optional[int]
+    error_message: str
 
 
 @dataclass(kw_only=True, frozen=True)
@@ -170,9 +178,11 @@ def get_mint_requests(
 XmrTxState = Union[XmrConfirmed, XmrPending, XmrNotFound]
 
 
-def call_monero_rpc(method: str, params: Optional[dict[str, Any]] = None) -> dict:
+def call_monero_rpc(
+    method: str, params: Optional[dict[str, Any]] = None
+) -> Union[dict[str, Any], MoneroRpcError]:
     """Make a JSON-RPC call to the Monero wallet RPC API."""
-    payload: Any = {
+    payload: dict[str, Any] = {
         "jsonrpc": "2.0",
         "id": "0",
         "method": method,
@@ -181,22 +191,38 @@ def call_monero_rpc(method: str, params: Optional[dict[str, Any]] = None) -> dic
     if params:
         payload["params"] = params
 
-    response = requests.post(
-        MONERO_STAGENET_API + "/json_rpc",
-        json=payload,
-        headers={"Content-Type": "application/json"},
-        auth=HTTPDigestAuth("monero", "rpcPassword"),
-        timeout=10,
-    )
-    response.raise_for_status()
+    try:
+        response = requests.post(
+            MONERO_STAGENET_API + "/json_rpc",
+            json=payload,
+            headers={"Content-Type": "application/json"},
+            auth=HTTPDigestAuth("monero", "rpcPassword"),
+            timeout=10,
+        )
+        response.raise_for_status()
+    except requests.RequestException as e:
+        logger.error("Monero RPC request failed: %s", e)
+        return MoneroRpcError(error_code=None, error_message=str(e))
 
-    result = response.json()
+    try:
+        response_json = response.json()
+    except ValueError as e:
+        logger.error("Failed to parse Monero RPC response as JSON: %s", e)
+        return MoneroRpcError(
+            error_code=None, error_message=f"Invalid JSON response: {e}"
+        )
 
-    if "error" in result:
-        logger.error("Monero RPC error: %s", result["error"])
-        raise RuntimeError(f"Monero RPC error: {result['error']}")
+    if "error" in response_json:
+        error = response_json["error"]
+        error_code = error.get("code") if isinstance(error, dict) else None
+        error_message = (
+            error.get("message", str(error)) if isinstance(error, dict) else str(error)
+        )
+        logger.error("Monero RPC error: %s", error_message)
+        return MoneroRpcError(error_code=error_code, error_message=error_message)
 
-    return result["result"]
+    result: dict[str, Any] = response_json["result"]
+    return result
 
 
 def test_monero_rpc_connection() -> None:
@@ -205,15 +231,22 @@ def test_monero_rpc_connection() -> None:
 
     result = call_monero_rpc("get_version")
 
-    version = result["version"]
-    major = version >> 16
-    minor = version & 0xFFFF
-    logger.info(
-        "Monero RPC connection to %s successful. Version: %d.%d",
-        MONERO_STAGENET_API,
-        major,
-        minor,
-    )
+    match result:
+        case MoneroRpcError() as error:
+            logger.error("Failed to connect to Monero RPC: %s", error.error_message)
+            raise RuntimeError(f"Monero RPC connection failed: {error.error_message}")
+        case dict() as data:
+            version = data["version"]
+            major = version >> 16
+            minor = version & 0xFFFF
+            logger.info(
+                "Monero RPC connection to %s successful. Version: %d.%d",
+                MONERO_STAGENET_API,
+                major,
+                minor,
+            )
+        case _:
+            raise RuntimeError("Unexpected response type from Monero RPC")
 
 
 # https://docs.getmonero.org/rpc-library/wallet-rpc/#check_tx_key
@@ -225,33 +258,40 @@ def check_xmr_tx_key(
 
     logger.info("Checking XMR tx %s", txid)
 
-    try:
-        data = call_monero_rpc("check_tx_key", params)
-    except RuntimeError:
-        return XmrNotFound(txid=txid, address=address, tx_key=tx_key)
+    result = call_monero_rpc("check_tx_key", params)
 
-    confirmations = data["confirmations"]
-    in_pool: bool = data["in_pool"]
-    received = XmrAmount(data["received"])
+    match result:
+        case MoneroRpcError():
+            return XmrNotFound(txid=txid, address=address, tx_key=tx_key)
+        case dict() as data:
+            confirmations = data["confirmations"]
+            in_pool: bool = data["in_pool"]
+            received = XmrAmount(data["received"])
 
-    enough_confirmations: bool = confirmations >= MONERO_REQUIRED_CONFIRMATIONS
-    match in_pool, enough_confirmations:
-        case True, _:
-            return XmrPending(
-                txid=txid, tx_key=tx_key, address=address, confirmations=confirmations
-            )
-        case _, True:
-            return XmrConfirmed(
-                txid=txid,
-                tx_key=tx_key,
-                address=address,
-                confirmations=confirmations,
-                received=received,
-            )
-        case _, _:
-            return XmrPending(
-                txid=txid, tx_key=tx_key, address=address, confirmations=confirmations
-            )
+            enough_confirmations: bool = confirmations >= MONERO_REQUIRED_CONFIRMATIONS
+            match in_pool, enough_confirmations:
+                case True, _:
+                    return XmrPending(
+                        txid=txid,
+                        tx_key=tx_key,
+                        address=address,
+                        confirmations=confirmations,
+                    )
+                case _, True:
+                    return XmrConfirmed(
+                        txid=txid,
+                        tx_key=tx_key,
+                        address=address,
+                        confirmations=confirmations,
+                        received=received,
+                    )
+                case _, _:
+                    return XmrPending(
+                        txid=txid,
+                        tx_key=tx_key,
+                        address=address,
+                        confirmations=confirmations,
+                    )
 
 
 def match_mint_request(request: WXmrMintRequest) -> Optional[XmrConfirmed]:
