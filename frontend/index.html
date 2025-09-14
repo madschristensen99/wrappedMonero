@@ -39,7 +39,6 @@
                 </button>
                 <button class="tab-btn" data-tab="transfer">Transfer</button>
                 <button class="tab-btn" data-tab="mint">Mint</button>
-                <button class="tab-btn" data-tab="admin">Admin</button>
             </div>
 
             <div id="balance-tab" class="tab-content active">
@@ -164,95 +163,6 @@
                 </div>
             </div>
 
-            <div id="admin-tab" class="tab-content">
-                <h3>Admin Functions</h3>
-                <div class="admin-section">
-                    <h4>Decrypt Cache Functions</h4>
-                    <button id="decryptTotalSupply" class="btn btn-secondary">
-                        Decrypt Total Supply
-                    </button>
-                    <button id="decryptBalance" class="btn btn-secondary">
-                        Decrypt My Balance
-                    </button>
-
-                    <h4>Mint & Burn (Multisig Required)</h4>
-                    <div class="form-group">
-                        <h5>Mint Tokens</h5>
-                        <input
-                            type="text"
-                            id="mintAddress"
-                            placeholder="Recipient Address"
-                            required
-                        />
-                        <input
-                            type="number"
-                            id="mintAmount"
-                            placeholder="Amount"
-                            min="0"
-                            step="0.000001"
-                            required
-                        />
-                        <div id="mintSignatures">
-                            <input
-                                type="text"
-                                id="mintV"
-                                placeholder="v signatures (comma separated)"
-                                required
-                            />
-                            <input
-                                type="text"
-                                id="mintR"
-                                placeholder="r signatures (comma separated)"
-                                required
-                            />
-                            <input
-                                type="text"
-                                id="mintS"
-                                placeholder="s signatures (comma separated)"
-                                required
-                            />
-                        </div>
-                        <button id="mintBtn" class="btn btn-primary">
-                            Mint
-                        </button>
-                    </div>
-
-                    <div class="form-group">
-                        <h5>Burn Tokens</h5>
-                        <input
-                            type="number"
-                            id="burnAmount"
-                            placeholder="Amount to Burn"
-                            min="0"
-                            step="0.000001"
-                            required
-                        />
-                        <div id="burnSignatures">
-                            <input
-                                type="text"
-                                id="burnV"
-                                placeholder="v signatures (comma separated)"
-                                required
-                            />
-                            <input
-                                type="text"
-                                id="burnR"
-                                placeholder="r signatures (comma separated)"
-                                required
-                            />
-                            <input
-                                type="text"
-                                id="burnS"
-                                placeholder="s signatures (comma separated)"
-                                required
-                            />
-                        </div>
-                        <button id="burnBtn" class="btn btn-primary">
-                            Burn
-                        </button>
-                    </div>
-                </div>
-            </div>
 
             <div id="loading" class="loading" style="display: none">
                 <div class="spinner"></div>

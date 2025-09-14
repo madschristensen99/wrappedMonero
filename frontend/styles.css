@@ -210,22 +210,6 @@ header p {
     box-shadow: 0 0 0 0.2rem rgba(0, 102, 204, 0.25);
 }
 
-.admin-section h4,
-.admin-section h5 {
-    margin: 20px 0 10px 0;
-    color: var(--primary-color);
-}
-
-.admin-section .form-group {
-    background: #f8f9fa;
-    padding: 15px;
-    border-radius: 8px;
-    margin-bottom: 15px;
-}
-
-.admin-section .form-group input {
-    margin-bottom: 10px;
-}
 
 .loading {
     position: fixed;
