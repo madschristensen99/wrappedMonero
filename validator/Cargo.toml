@@ -1,0 +1,32 @@
+[package]
+name = "validator-tss"
+version = "0.1.0"
+edition = "2021"
+
+[[bin]]
+name = "simple_validator"
+path = "src/simple_validator.rs"
+
+[dependencies]
+tokio = { version = "1", features = ["full"] }
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+axum = "0.7"
+tower = "0.4"
+anyhow = "1.0"
+clap = { version = "4.4", features = ["derive", "env"] }
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+
+# Using simplified implementation for demo - real implementation would use proper TSS
+secp256k1 = { version = "0.28", features = ["recovery", "global-context"] }
+hex = "0.4"
+rand = "0.8"
+serde_bytes = "0.11"
+url = "2.4"
+reqwest = { version = "0.11", features = ["json", "tokio-rustls"] }
+thiserror = "1.0"
+futures = "0.3"
+bimap = "0.6"
+k256 = "0.13"
+sha2 = "0.10"

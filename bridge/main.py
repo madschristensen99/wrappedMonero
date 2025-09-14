@@ -3,18 +3,22 @@ import json
 from dataclasses import dataclass
 import os
 import asyncio
-from typing import Optional, Union, NewType, TypedDict
+from typing import Optional, Union, NewType, TypedDict, List, Dict
 from pathlib import Path
 import requests
+import aiohttp
 import dotenv
 
 from eth_typing import HexAddress, HexStr
 from eth_typing.evm import ChecksumAddress as EvmAddress
 from web3 import Web3
 import logging
+import time
 
 from web3.eth import Contract
 from web3.types import TxParams, Wei
+
+from validator_client import DistributedBridgeClient
 
 dotenv.load_dotenv()
 
@@ -303,79 +307,108 @@ def add_processed_request(processed_request: ProcessedXmrMintRequest) -> None:
         data_file.write_text(json.dumps(data, indent=2))
 
 
+async def mint_w_xmr_THRES_SIGNATURE(
+    contract: Contract, w3: Web3, amount: XmrAmount, tx_secret: XmrTxKey
+) -> None:
+    """Submit threshold-signature based mint confirmation to wXMR contract."""
+    # Use decentralized validator client
+    validator_urls = [
+        "http://localhost:8001",
+        "http://localhost:8002", 
+        "http://localhost:8003",
+        "http://localhost:8004",
+        "http://localhost:8005",
+        "http://localhost:8006",
+        "http://localhost:8007"
+    ]
+    
+    async with DistributedBridgeClient() as client:
+        # Submit mint request to validator network
+        result = await client.submit_threshold_mint_request(
+            tx_secret, 
+            int(amount), 
+            "0x0000000000000000000000000000000000000000"  # placeholder
+        )
+        
+        if not result:
+            logger.error("Insufficient validator signatures for mint request")
+            return
+            
+        logger.info("Got threshold signatures, constructing contract call")
+        
+        # Get account from private key
+        account = w3.eth.account.from_key(ETH_PRIVATE_KEY)
+        
+        # Construct operation hash for contract verification
+        operation_hash = result['operation_hash']
+        signature = result['signature']
+        
+        # Build confirmMintWithSig transaction
+        tx = contract.functions.confirmMintWithSig(
+            tx_secret,
+            int(amount),
+            {
+                "operationHash": operation_hash,
+                "signature": signature,
+                "timestamp": result['timestamp'],
+                "nonce": result['nonce']
+            },
+            {
+                "r": bytes.fromhex(signature['r']),
+                "s": bytes.fromhex(signature['s']),  
+                "v": signature['v']
+            }
+        )
+        
+        # Estimate and submit transaction
+        gas_limit = tx.estimate_gas({"from": account.address})
+        tx_hash = w3.eth.send_transaction(tx.build_transaction({
+            "from": account.address,
+            "gas": int(gas_limit * 1.2),
+            "maxFeePerGas": w3.eth.gas_price * 2,
+            "maxPriorityFeePerGas": w3.to_wei(2, "gwei"),
+            "nonce": w3.eth.get_transaction_count(account.address)
+        }))
+        
+        logger.info("Submitted threshold signature mint: %s", tx_hash.hex())
+        
+        # Wait for confirmation
+        receipt = w3.eth.wait_for_transaction_receipt(tx_hash, timeout=180)
+        if receipt.status == 1:
+            logger.info("Threshold signature mint confirmed successfully")
+        else:
+            logger.error("Threshold signature mint failed")
+
+# Legacy mint function kept for backward compatibility
 def mint_w_xmr(
     contract: Contract, w3: Web3, amount: XmrAmount, tx_secret: XmrTxKey
 ) -> None:
-    """Call the confirmMint function on the wXMR contract."""
-    # Get account from private key
-    account = w3.eth.account.from_key(ETH_PRIVATE_KEY)
-
-    # Log the parameters being passed to confirmMint
-    logger.info(
-        "Calling confirmMint with tx_secret: %s, amount: %d",
-        tx_secret.hex(),
-        int(amount),
-    )
-
-    # Estimate gas first
+    """Call the legacy confirmMint function (authority-based)."""
+    # Old centralized authority approach - kept for migration period
+    web3 = w3  
+    account = web3.eth.account.from_key(ETH_PRIVATE_KEY)
+    
     try:
-        estimated_gas = contract.functions.confirmMint(
-            tx_secret,  # Convert to bytes32
-            int(amount),  # Convert to uint64
-        ).estimate_gas({"from": account.address})
-        gas_limit = int(estimated_gas * 1.2)  # Add 20% buffer
-        logger.info("Estimated gas: %d, using limit: %d", estimated_gas, gas_limit)
-    except Exception:
-        logger.exception("Gas estimation failed, using default limit")
-        gas_limit = 500000
-
-    # Calculate proper fee structure for London transaction
-    base_fee = w3.eth.gas_price
-    priority_fee = w3.to_wei(2, "gwei")
-    max_fee = Wei(max(base_fee * 2, priority_fee + base_fee))
-
-    # Build transaction
-    params: TxParams = {
-        "from": account.address,
-        "nonce": w3.eth.get_transaction_count(account.address),
-        "gas": gas_limit,
-        "maxFeePerGas": max_fee,  # London transaction
-        "maxPriorityFeePerGas": priority_fee,  # Priority fee
-    }
-    tx = contract.functions.confirmMint(
-        tx_secret,  # Convert to bytes32
-        int(amount),  # Convert to uint64
-    ).build_transaction(params)
-
-    # Sign and send transaction
-    signed_tx = w3.eth.account.sign_transaction(tx, ETH_PRIVATE_KEY)
-    tx_hash = w3.eth.send_raw_transaction(signed_tx.raw_transaction)
-
-    logger.info("Sent confirmMint transaction: %s", tx_hash.hex())
-
-    # Wait for transaction confirmation
-    try:
-        receipt = w3.eth.wait_for_transaction_receipt(tx_hash, timeout=120)
-        match receipt["status"]:
-            case 1:
-                logger.info(
-                    "Transaction %s confirmed successfully in block %d",
-                    tx_hash.hex(),
-                    receipt["blockNumber"],
-                )
-            case _:
-                logger.error(
-                    "Transaction %s failed with status %d",
-                    tx_hash.hex(),
-                    receipt["status"],
-                )
+        tx = contract.functions.confirmMint(tx_secret, int(amount)).send_transaction({
+            "from": account.address,
+            "gas": 500000,
+            "maxFeePerGas": web3.eth.gas_price * 2,
+            "nonce": web3.eth.get_transaction_count(account.address)
+        })
+        
+        logger.info("Legacy mint transaction submitted: %s", tx.hex())
+        
     except Exception as e:
-        logger.error(
-            "Error waiting for transaction %s confirmation: %s", tx_hash.hex(), e
-        )
+        logger.error("Legacy mint failed: %s", str(e))
+
+async def mint_w_xmr_threshold(
+    contract: Contract, w3: Web3, amount: XmrAmount, tx_secret: XmrTxKey
+) -> None:
+    """New distributed minting using threshold signatures."""
+    await mint_w_xmr_THRES_SIGNATURE(contract, w3, amount, tx_secret)
 
 
-def process_revealed_txs(contract: Contract, w3: Web3) -> None:
+async def process_revealed_txs(contract: Contract, w3: Web3) -> None:
     # 1. Calculate the confirmed block height (current - required confirmations)
     current_block = contract.w3.eth.block_number
     confirmed_block = EvmHeight(max(0, current_block - EVM_REQUIRED_CONFIRMATIONS))
@@ -413,8 +446,7 @@ def process_revealed_txs(contract: Contract, w3: Web3) -> None:
 
     logger.info("Found %d confirmed XMR mint requests", len(confirmed_requests))
 
-    # 4. Send a mint transaction to the wXMR
-    #    contract with the matching amount of wXMR to the receive address
+    # 4. Initiate threshold signing process with validator network
     minted_requests: set[ProcessedXmrMintRequest] = set()
     for confirmed_request in confirmed_requests:
         # Check if the secret has already been used on the contract
@@ -429,12 +461,17 @@ def process_revealed_txs(contract: Contract, w3: Web3) -> None:
             continue
 
         logger.info("%s", confirmed_request)
-        mint_w_xmr(
-            contract,
-            w3,
-            confirmed_request.xmr_confirmed.received,
-            confirmed_request.mint_request.tx_key,
+        
+        # Use new threshold signature approach
+        asyncio.create_task(
+            mint_w_xmr_threshold(
+                contract,
+                w3,
+                confirmed_request.xmr_confirmed.received,
+                confirmed_request.mint_request.tx_key,
+            )
         )
+        
         processed_request = ProcessedXmrMintRequest(
             transaction_id=confirmed_request.mint_request.txid,
             transaction_secret=confirmed_request.mint_request.tx_key,
@@ -466,6 +503,9 @@ async def main() -> None:
     # Get account address for balance checking
     account = w3.eth.account.from_key(ETH_PRIVATE_KEY)
     logger.info("Using Ethereum address: %s", account.address)
+    
+    # Initialize distributed bridge client
+    bridge_client = DistributedBridgeClient("./validator_urls.json")
 
     while True:
         # Check ETH balance
@@ -473,8 +513,8 @@ async def main() -> None:
         balance_eth = w3.from_wei(balance_wei, "ether")
         logger.info("Current ETH balance: %s ETH", balance_eth)
 
-        process_revealed_txs(w_xmr_contract, w3)
-        await asyncio.sleep(1)
+        await process_revealed_txs(w_xmr_contract, w3)
+        await asyncio.sleep(10)  # Increased interval for validator coordination
 
 
 if __name__ == "__main__":
