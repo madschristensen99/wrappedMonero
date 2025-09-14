@@ -108,6 +108,7 @@ will revert.
 This may lead to the bridge wasting gas fees on a transaction that does not
 do anything productive.
 """
+
 import json
 from dataclasses import dataclass
 import asyncio
@@ -641,7 +642,9 @@ def get_processed_burn_requests() -> set[ProcessedXmrBurnRequest]:
     data: list[ProcessedBurnDict] = json.loads(data_file.read_text())
     processed = set()
     for item in data:
-        xmr_tx_id = XmrTxId(bytes.fromhex(item["xmr_tx_id"])) if item["xmr_tx_id"] else None
+        xmr_tx_id = (
+            XmrTxId(bytes.fromhex(item["xmr_tx_id"])) if item["xmr_tx_id"] else None
+        )
         processed.add(
             ProcessedXmrBurnRequest(
                 burn_tx_hash=item["burn_tx_hash"],
@@ -676,7 +679,9 @@ def add_processed_burn_request(processed_request: ProcessedXmrBurnRequest) -> No
         "user_address": processed_request.user_address,
         "amount": processed_request.amount,
         "xmr_destination": processed_request.xmr_destination,
-        "xmr_tx_id": processed_request.xmr_tx_id.hex() if processed_request.xmr_tx_id else None,
+        "xmr_tx_id": processed_request.xmr_tx_id.hex()
+        if processed_request.xmr_tx_id
+        else None,
         "processed_at": datetime.utcnow().isoformat(),
     }
 
