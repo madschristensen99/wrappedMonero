@@ -13,7 +13,7 @@ logger = logging.getLogger(__name__)
 
 
 def request_mint():
-    """Send a requestMint transaction to the wXMR contract."""
+    """Send a requestMint transaction to the WXMR contract."""
     # Connect to Ethereum
     w3 = Web3(Web3.HTTPProvider(EVM_SEPOLIA_API))
     assert w3.is_connected()

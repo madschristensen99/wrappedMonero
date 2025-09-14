@@ -1,11 +1,11 @@
 #!/usr/bin/env -S uv run
 """
-XMR to wXMR Bridge
+Wrapped Monero Bridge
 
 This bridge has two main functions:
 
-1. Mint wXMR and accepting XMR when receiving wXMR mint requests
-2. Burn wXMR and transfer XMR to receiver address when receiving wXMR burn request.
+1. Mint WXMR and accepting XMR when receiving WXMR mint requests
+2. Burn WXMR and transfer XMR to receiver address when receiving WXMR burn request.
 
    -------->NETWORK VIEW<-----------
 
@@ -34,14 +34,14 @@ This bridge has two main functions:
             |           ^      |
        (4)  |      (3)  |      |
       Mint  |  Request  |      | (2) Request
-      wXMR  |     Mint  |      |     Mint
+      WXMR  |     Mint  |      |     Mint
             |    Event  |      |
             |           |      |
             |           |      |
             |           |      |
             |           |      v
             |    .----+---------.
-            .--->|wXMR Contract |      wXMR holder
+            .--->|WXMR Contract |      WXMR holder
                  .--------------.
 
      ----->LOGICAL VIEW (burn)<------------
@@ -56,14 +56,14 @@ This bridge has two main functions:
             |           ^      |
        (3)  |      (2)  |      |
       Burn  |  Request  |      | (1) Request
-      wXMR  |     Burn  |      |     Burn
+      WXMR  |     Burn  |      |     Burn
             |    Event  |      |
             |           |      |
             |           |      |
             |           |      |
             |           |      v
             |    .----+---------.
-            .--->|wXMR Contract |      wXMR holder
+            .--->|WXMR Contract |      WXMR holder
                  .--------------.
 
 ---->Description of minting algorithm<----
@@ -72,7 +72,7 @@ For minting transactions, we distinguish between the following mint requests:
 
 1. Mint requests with no matching XMR deposit
 2. Mint requests with a matching XMR deposit
-3. Mint requests that the bridge has already minted wXMR for
+3. Mint requests that the bridge has already minted WXMR for
 
 To avoid querying the state of the Ethereum (or EVM) node for event logs
 continuously, the bridge caches mint requests. In the code, their variable name
@@ -82,10 +82,10 @@ logs are `log_requests`.
 Once the bridge has handled a request, it puts these in a separate cache and
 in a variable called `processed_requests`. All the bridge has to do then is
 to filter out mint requests with no matching XMR deposit and those
-that it has already minted wXMR for. It puts these new requests in a variable
+that it has already minted WXMR for. It puts these new requests in a variable
 called `confirmed_requests`.
 
-Once these mint requests have their matching wXMR minted, these fully
+Once these mint requests have their matching WXMR minted, these fully
 processed mint requests then move to `minted_requests`. Finally, the bridge
 updates its minimimum block height for EVM event logs to match the
 most recently handled event log's block height. Doing so, the bridge avoids
@@ -98,10 +98,10 @@ Interesting edge cases not handled:
 3. Running out of gas
 4. Miscalculation of required gas and gas limit
 
-The wXMR contract prevents the bridge from minting wXMR for the same request
+The WXMR contract prevents the bridge from minting WXMR for the same request
 twice. Every `confirmMint` (the ABI function name for fulfilling a mint request)
 requires the bridge to pass the XMR transaction secret. Once the bridge
-confirms the mint, the wXMR marks this particular mint request as done.
+confirms the mint, the WXMR marks this particular mint request as done.
 If the bridge then tries to confirm this mint a second time, the transaction
 will revert.
 
@@ -180,12 +180,12 @@ class XmrConfirmed(XmrTxStateBase):
 
 @dataclass(kw_only=True, frozen=True)
 class WXmrMintRequest:
-    """Contains the information needed to mint wXMR."""
+    """Contains the information needed to mint WXMR."""
 
     txid: XmrTxId
     tx_key: XmrTxKey
     # Amount is pulled in from the XMR output
-    # Who should receive the wXMR?
+    # Who should receive the WXMR?
     receiver: EvmAddress
     # Maybe
     evm_height: EvmHeight
@@ -193,7 +193,7 @@ class WXmrMintRequest:
 
 @dataclass(kw_only=True, frozen=True)
 class WXmrBurnRequest:
-    """Contains the information needed to process a wXMR burn."""
+    """Contains the information needed to process a WXMR burn."""
 
     user_address: EvmAddress
     amount: XmrAmount
@@ -770,7 +770,7 @@ def remove_pending_burn_request(pending_request: PendingXmrBurnRequest) -> None:
 def mint_w_xmr(
     contract: Contract, w3: Web3, amount: XmrAmount, tx_secret: XmrTxKey
 ) -> None:
-    """Call the confirmMint function on the wXMR contract."""
+    """Call the confirmMint function on the WXMR contract."""
     # Get account from private key
     account = w3.eth.account.from_key(ETH_PRIVATE_KEY)
 
@@ -851,7 +851,7 @@ def process_revealed_txs(contract: Contract, w3: Web3) -> None:
     # 2c. Concatenate log requests and pending requests
     new_requests = log_requests + pending_mint_requests
 
-    # 3. Check for which revealed txs we already minted wXMR, filter them out
+    # 3. Check for which revealed txs we already minted WXMR, filter them out
     processed_requests = get_processed_requests()
     processed_tuples = {
         (p.transaction_id, p.transaction_secret) for p in processed_requests
@@ -927,8 +927,8 @@ def process_revealed_txs(contract: Contract, w3: Web3) -> None:
 
     logger.info("Found %d confirmed XMR mint requests", len(confirmed_requests))
 
-    # 5. Send a mint transaction to the wXMR
-    #    contract with the matching amount of wXMR to the receive address
+    # 5. Send a mint transaction to the WXMR
+    #    contract with the matching amount of WXMR to the receive address
     minted_requests: set[ProcessedXmrMintRequest] = set()
     for confirmed_request in confirmed_requests:
         # Check if the secret has already been used on the contract
@@ -964,7 +964,7 @@ def process_revealed_txs(contract: Contract, w3: Web3) -> None:
 
 
 def process_burn_requests(contract: Contract, w3: Web3) -> None:
-    """Process burn requests from the wXMR contract and send XMR to users."""
+    """Process burn requests from the WXMR contract and send XMR to users."""
     # TODO: This function will be implemented once the burn event is added to the contract
     # For now, just log that it's being called
     logger.debug("Processing burn requests (not yet implemented)")
