@@ -7,6 +7,7 @@ from typing import Optional, Union, NewType, TypedDict
 from pathlib import Path
 import requests
 import dotenv
+from requests.auth import HTTPDigestAuth
 
 from eth_typing import HexAddress, HexStr
 from eth_typing.evm import ChecksumAddress as EvmAddress
@@ -38,9 +39,12 @@ EVM_REQUIRED_CONFIRMATIONS = 1
 
 # monero cli RPC API connection info
 # https://monero.fail/?chain=monero&network=stagenet
-MONERY_STAGENET_API = "http://stagenet.xmr-tw.org:38081"
+MONERO_STAGENET_API = "http://localhost:38081"
 # Completely arbitrary
-MONERY_REQUIRED_CONFIRMATIONS = 6
+MONERO_REQUIRED_CONFIRMATIONS = 6
+
+# Gas estimation buffer (20% extra)
+GAS_BUFFER_MULTIPLIER = 1.2
 
 ETH_PRIVATE_KEY = os.environ["ETH_PRIVATE_KEY"]
 
@@ -165,6 +169,36 @@ def get_mint_requests(
 XmrTxState = Union[XmrConfirmed, XmrPending, XmrNotFound]
 
 
+def test_monero_rpc_connection() -> None:
+    """Test the Monero RPC connection by calling get_version."""
+    payload = {
+        "jsonrpc": "2.0",
+        "id": "0",
+        "method": "get_version",
+    }
+    logger.info("Testing Monero RPC connection...")
+
+    response = requests.post(
+        MONERO_STAGENET_API + "/json_rpc",
+        json=payload,
+        headers={"Content-Type": "application/json"},
+        auth=HTTPDigestAuth("monero", "rpcPassword"),
+        timeout=10,
+    )
+    response.raise_for_status()
+
+    result = response.json()
+
+    if "error" in result:
+        logger.error("Monero RPC error: %s", result["error"])
+        raise RuntimeError(f"Monero RPC error: {result['error']}")
+
+    version = result["result"]["version"]
+    major = version >> 16
+    minor = version & 0xFFFF
+    logger.info("Monero RPC connection successful. Version: %d.%d", major, minor)
+
+
 # https://docs.getmonero.org/rpc-library/wallet-rpc/#check_tx_key
 def check_xmr_tx_key(
     txid: XmrTxId, address: XmrAddress, tx_key: XmrTxKey
@@ -179,9 +213,10 @@ def check_xmr_tx_key(
     logger.info("Checking XMR tx %s", txid)
 
     response = requests.post(
-        MONERY_STAGENET_API + "/json_rpc",
+        MONERO_STAGENET_API + "/json_rpc",
         json=payload,
         headers={"Content-Type": "application/json"},
+        auth=HTTPDigestAuth("monero", "rpcPassword"),
     )
     response.raise_for_status()
 
@@ -196,23 +231,24 @@ def check_xmr_tx_key(
     in_pool = data["in_pool"]
     received = XmrAmount(data["received"])
 
-    enough_confirmations = confirmations >= MONERY_REQUIRED_CONFIRMATIONS
-    if in_pool:
-        return XmrPending(
-            txid=txid, tx_key=tx_key, address=address, confirmations=confirmations
-        )
-    elif enough_confirmations:
-        return XmrConfirmed(
-            txid=txid,
-            tx_key=tx_key,
-            address=address,
-            confirmations=confirmations,
-            received=received,
-        )
-    else:
-        return XmrPending(
-            txid=txid, tx_key=tx_key, address=address, confirmations=confirmations
-        )
+    enough_confirmations = confirmations >= MONERO_REQUIRED_CONFIRMATIONS
+    match in_pool, enough_confirmations:
+        case True, _:
+            return XmrPending(
+                txid=txid, tx_key=tx_key, address=address, confirmations=confirmations
+            )
+        case _, True:
+            return XmrConfirmed(
+                txid=txid,
+                tx_key=tx_key,
+                address=address,
+                confirmations=confirmations,
+                received=received,
+            )
+        case _, _:
+            return XmrPending(
+                txid=txid, tx_key=tx_key, address=address, confirmations=confirmations
+            )
 
 
 def match_mint_request(request: WXmrMintRequest) -> Optional[XmrConfirmed]:
@@ -220,7 +256,7 @@ def match_mint_request(request: WXmrMintRequest) -> Optional[XmrConfirmed]:
     state = check_xmr_tx_key(request.txid, XMR_RECEIVE_ADDRESS, request.tx_key)
 
     match state:
-        case XmrConfirmed() if state.confirmations >= MONERY_REQUIRED_CONFIRMATIONS:
+        case XmrConfirmed() if state.confirmations >= MONERO_REQUIRED_CONFIRMATIONS:
             return state
         case _:
             return None
@@ -318,16 +354,12 @@ def mint_w_xmr(
     )
 
     # Estimate gas first
-    try:
-        estimated_gas = contract.functions.confirmMint(
-            tx_secret,  # Convert to bytes32
-            int(amount),  # Convert to uint64
-        ).estimate_gas({"from": account.address})
-        gas_limit = int(estimated_gas * 1.2)  # Add 20% buffer
-        logger.info("Estimated gas: %d, using limit: %d", estimated_gas, gas_limit)
-    except Exception:
-        logger.exception("Gas estimation failed, using default limit")
-        gas_limit = 500000
+    estimated_gas = contract.functions.confirmMint(
+        tx_secret,  # Convert to bytes32
+        int(amount),  # Convert to uint64
+    ).estimate_gas({"from": account.address})
+    gas_limit = int(estimated_gas * GAS_BUFFER_MULTIPLIER)
+    logger.info("Estimated gas: %d, using limit: %d", estimated_gas, gas_limit)
 
     # Calculate proper fee structure for London transaction
     base_fee = w3.eth.gas_price
@@ -454,6 +486,9 @@ def process_revealed_txs(contract: Contract, w3: Web3) -> None:
 
 async def main() -> None:
     logging.basicConfig(level=logging.INFO)
+
+    # Test Monero RPC connection first
+    test_monero_rpc_connection()
 
     w3 = Web3(Web3.HTTPProvider(EVM_SEPOLIA_API))
     assert w3.is_connected()
