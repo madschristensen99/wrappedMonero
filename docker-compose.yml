@@ -1,0 +1,178 @@
+version: '3.8'
+
+services:
+  # Validator nodes (7 total for 4-of-7 threshold)
+  validator-1:
+    build:
+      context: ./validator
+      dockerfile: Dockerfile
+    container_name: wxmr-validator-1
+    ports:
+      - "8001:8001"
+    volumes:
+      - ./validator/configs/validator1.toml:/app/config.toml
+      - validator1_keys:/app/keys
+    environment:
+      - VALIDATOR_ID=1
+      - RPC_PORT=8001
+    depends_on:
+      - contract-check
+
+  validator-2:
+    build:
+      context: ./validator
+      dockerfile: Dockerfile
+    container_name: wxmr-validator-2
+    ports:
+      - "8002:8001"
+    volumes:
+      - ./validator/configs/validator2.toml:/app/config.toml
+      - validator2_keys:/app/keys
+    environment:
+      - VALIDATOR_ID=2
+      - RPC_PORT=8001
+    depends_on:
+      - contract-check
+
+  validator-3:
+    build:
+      context: ./validator
+      dockerfile: Dockerfile
+    container_name: wxmr-validator-3
+    ports:
+      - "8003:8001"
+    volumes:
+      - ./validator/configs/validator3.toml:/app/config.toml
+      - validator3_keys:/app/keys
+    environment:
+      - VALIDATOR_ID=3
+      - RPC_PORT=8001
+    depends_on:
+      - contract-check
+
+  validator-4:
+    build:
+      context: ./validator
+      dockerfile: Dockerfile
+    container_name: wxmr-validator-4
+    ports:
+      - "8004:8001"
+    volumes:
+      - ./validator/configs/validator4.toml:/app/config.toml
+      - validator4_keys:/app/keys
+    environment:
+      - VALIDATOR_ID=4
+      - RPC_PORT=8001
+    depends_on:
+      - contract-check
+
+  validator-5:
+    build:
+      context: ./validator
+      dockerfile: Dockerfile
+    container_name: wxmr-validator-5
+    ports:
+      - "8005:8001"
+    volumes:
+      - ./validator/configs/validator5.toml:/app/config.toml
+      - validator5_keys:/app/keys
+    environment:
+      - VALIDATOR_ID=5
+      - RPC_PORT=8001
+    depends_on:
+      - contract-check
+
+  validator-6:
+    build:
+      context: ./validator
+      dockerfile: Dockerfile
+    container_name: wxmr-validator-6
+    ports:
+      - "8006:8001"
+    volumes:
+      - ./validator/configs/validator6.toml:/app/config.toml
+      - validator6_keys:/app/keys
+    environment:
+      - VALIDATOR_ID=6
+      - RPC_PORT=8001
+    depends_on:
+      - contract-check
+
+  validator-7:
+    build:
+      context: ./validator
+      dockerfile: Dockerfile
+    container_name: wxmr-validator-7
+    ports:
+      - "8007:8001"
+    volumes:
+      - ./validator/configs/validator7.toml:/app/config.toml
+      - validator7_keys:/app/keys
+    environment:
+      - VALIDATOR_ID=7
+      - RPC_PORT=8001
+    depends_on:
+      - contract-check
+
+  # Updated Python bridge that uses distributed validators
+  bridge:
+    build:
+      context: ./bridge
+      dockerfile: Dockerfile
+    container_name: wxmr-bridge
+    depends_on:
+      - validator-1
+      - validator-2
+      - validator-3
+    volumes:
+      - ./bridge/:/app
+      - bridge_data:/app/data
+    environment:
+      - ETH_PRIVATE_KEY=${ETH_PRIVATE_KEY}
+      - XMR_RECEIVE_ADDRESS=${XMR_RECEIVE_ADDRESS}
+      - W_XMR_CONTRACT_ADDRESS=${W_XMR_CONTRACT_ADDRESS}
+    restart: unless-stopped
+
+  # Coordinator service for key generation ceremony
+  keygen-coordinator:
+    build:
+      context: ./validator
+      dockerfile: Dockerfile
+    container_name: wxmr-keygen
+    command: ["./validator-tss", "--generate-keys"]
+    profiles:
+      - setup
+    volumes:
+      - ./keys:/app/keys
+      - ./validator/config.toml:/app/config.toml
+    environment:
+      - VALIDATOR_COUNT=7
+      - THRESHOLD=4
+
+  # Health checker to ensure contract is ready
+  contract-check:
+    build:
+      context: ./bridge
+      dockerfile: Dockerfile
+    container_name: wxmr-contract-check
+    command: ["python", "-c", 
+      "import time; print('Waiting for contract setup...'); time.sleep(5)"]
+    profiles:
+      - setup
+
+volumes:
+  validator1_keys:
+  validator2_keys:
+  validator3_keys:
+  validator4_keys:
+  validator5_keys:
+  validator6_keys:
+  validator7_keys:
+  bridge_data:
+
+networks:
+  default:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.20.0.0/16
