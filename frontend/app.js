@@ -547,7 +547,7 @@ let userAddress;
 async function initApp() {
     console.log('Initializing app...');
     console.log('Ethers available:', typeof ethers !== 'undefined');
-    
+
     // Check if MetaMask is installed
     if (typeof window.ethereum === 'undefined') {
         showError('Please install MetaMask to use this application');
@@ -557,10 +557,10 @@ async function initApp() {
     try {
         // Request accounts
         provider = new ethers.BrowserProvider(window.ethereum);
-        
+
         // Initialize event listeners
         initializeEventListeners();
-        
+
         console.log('App initialized successfully');
     } catch (error) {
         console.error('Error initializing app:', error);
@@ -571,18 +571,18 @@ async function initApp() {
 function initializeEventListeners() {
     // Wallet connection
     document.getElementById('connectWallet').addEventListener('click', connectWallet);
-    
+
     // Tab switching
     document.querySelectorAll('.tab-btn').forEach(button => {
         button.addEventListener('click', (e) => switchTab(e.target.dataset.tab));
     });
-    
+
     // Balance refresh
     document.getElementById('refreshBalance').addEventListener('click', refreshBalance);
-    
+
     // Transfer form
     document.getElementById('transferForm').addEventListener('submit', handleTransfer);
-    
+
     // Admin functions
     document.getElementById('decryptTotalSupply').addEventListener('click', decryptTotalSupply);
     document.getElementById('decryptBalance').addEventListener('click', decryptBalance);
@@ -593,7 +593,7 @@ function initializeEventListeners() {
 async function connectWallet() {
     try {
         showLoading(true);
-        
+
         // Switch to Sepolia network (11155111)
         try {
             await window.ethereum.request({
@@ -626,22 +626,22 @@ async function connectWallet() {
         const accounts = await provider.send('eth_requestAccounts', []);
         userAddress = accounts[0];
         signer = provider.getSigner();
-        
+
         // Create contract instance with signer for writes
         contract = new ethers.Contract(CONTRACT_ADDRESS, CONTRACT_ABI, signer);
-        
+
         // Update UI
         document.getElementById('walletAddress').textContent = userAddress.substring(0, 6) + '...' + userAddress.substring(38);
         document.getElementById('connectWallet').style.display = 'none';
         document.getElementById('walletInfo').style.display = 'block';
-        
+
         // Get network name
         const network = await provider.getNetwork();
         document.getElementById('networkName').textContent = network.name || 'Fhenix Network';
-        
+
         // Load initial data
         await refreshBalance();
-        
+
         showLoading(false);
         showSuccess('Wallet connected successfully');
     } catch (error) {
@@ -656,28 +656,28 @@ async function refreshBalance() {
         showError('Please connect your wallet first');
         return;
     }
-    
+
     try {
         // Create contract instance with provider for reads
         const readContract = new ethers.Contract(CONTRACT_ADDRESS, CONTRACT_ABI, provider);
-        
+
         console.log('Fetching balance for address:', userAddress);
         console.log('Contract address:', CONTRACT_ADDRESS);
         const network = await provider.getNetwork();
         console.log('Network:', network);
         console.log('Chain ID:', network.chainId);
-        
+
         try {
             const balance = await readContract.balanceOf(userAddress);
             const totalSupply = await readContract.totalSupply();
-            
+
             document.getElementById('balance').textContent = ethers.formatEther(balance);
             document.getElementById('totalSupply').textContent = ethers.formatEther(totalSupply);
         } catch (error) {
             console.log('Contract might not be deployed at this address on Sepolia');
             document.getElementById('balance').textContent = 'Contract Not Deployed';
             document.getElementById('totalSupply').textContent = 'Contract Not Deployed';
-            
+
             // Add deployment guidance
             const msg = `Contract not found at ${CONTRACT_ADDRESS} on Sepolia. Please deploy the contract or update the address.`;
             console.error(msg);
@@ -691,27 +691,27 @@ async function refreshBalance() {
 
 async function handleTransfer(event) {
     event.preventDefault();
-    
+
     if (!contract) {
         showError('Please connect your wallet first');
         return;
     }
-    
+
     const recipient = document.getElementById('recipient').value;
     const amount = document.getElementById('amount').value;
-    
+
     if (!ethers.isAddress(recipient)) {
         showError('Invalid recipient address');
         return;
     }
-    
+
     const amountWei = ethers.parseEther(amount);
-    
+
     try {
         showLoading(true);
         const tx = await contract.transfer(recipient, amountWei);
         await tx.wait();
-        
+
         showLoading(false);
         showSuccess('Transfer completed successfully');
         document.getElementById('transferForm').reset();
@@ -728,12 +728,12 @@ async function decryptTotalSupply() {
         showError('Please connect your wallet first');
         return;
     }
-    
+
     try {
         showLoading(true);
         const tx = await contract.decryptTotalSupply();
         await tx.wait();
-        
+
         showLoading(false);
         showSuccess('Total supply decrypted');
         await refreshBalance();
@@ -749,12 +749,12 @@ async function decryptBalance() {
         showError('Please connect your wallet first');
         return;
     }
-    
+
     try {
         showLoading(true);
         const tx = await contract.decryptBalance(userAddress);
         await tx.wait();
-        
+
         showLoading(false);
         showSuccess('Balance decrypted');
         await refreshBalance();
@@ -770,27 +770,27 @@ async function mintTokens() {
         showError('Please connect your wallet first');
         return;
     }
-    
+
     const toAddress = document.getElementById('mintAddress').value;
     const amount = document.getElementById('mintAmount').value;
     const vInputs = document.getElementById('mintV').value.split(',').map(v => parseInt(v.trim()));
     const rInputs = document.getElementById('mintR').value.split(',').map(r => r.trim());
     const sInputs = document.getElementById('mintS').value.split(',').map(s => s.trim());
-    
+
     if (!ethers.isAddress(toAddress)) {
         showError('Invalid recipient address');
         return;
     }
-    
+
     if (vInputs.length !== 3 || rInputs.length !== 3 || sInputs.length !== 3) {
         showError('Please provide exactly 3 signatures for minting');
         return;
     }
-    
+
     try {
         showLoading(true);
         const amountWei = ethers.parseEther(amount);
-        
+
         const tx = await contract.mint(
             toAddress,
             amountWei,
@@ -799,7 +799,7 @@ async function mintTokens() {
             sInputs.map(s => ethers.zeroPadValue(s, 32))
         );
         await tx.wait();
-        
+
         showLoading(false);
         showSuccess('Tokens minted successfully');
         await refreshBalance();
@@ -815,21 +815,21 @@ async function burnTokens() {
         showError('Please connect your wallet first');
         return;
     }
-    
+
     const amount = document.getElementById('burnAmount').value;
     const vInputs = document.getElementById('burnV').value.split(',').map(v => parseInt(v.trim()));
     const rInputs = document.getElementById('burnR').value.split(',').map(r => r.trim());
     const sInputs = document.getElementById('burnS').value.split(',').map(s => s.trim());
-    
+
     if (vInputs.length !== 3 || rInputs.length !== 3 || sInputs.length !== 3) {
         showError('Please provide exactly 3 signatures for burning');
         return;
     }
-    
+
     try {
         showLoading(true);
         const amountWei = ethers.parseEther(amount);
-        
+
         const tx = await contract.burn(
             amountWei,
             vInputs,
@@ -837,7 +837,7 @@ async function burnTokens() {
             sInputs.map(s => ethers.zeroPadValue(s, 32))
         );
         await tx.wait();
-        
+
         showLoading(false);
         showSuccess('Tokens burned successfully');
         await refreshBalance();
@@ -871,7 +871,7 @@ function switchTab(tabName) {
         btn.classList.remove('active');
     });
     document.querySelector(`[data-tab="${tabName}"]`).classList.add('active');
-    
+
     // Update tab content
     document.querySelectorAll('.tab-content').forEach(content => {
         content.classList.remove('active');
@@ -893,7 +893,7 @@ if (window.ethereum) {
             location.reload();
         }
     });
-    
+
     window.ethereum.on('chainChanged', () => {
         // Network changed
         location.reload();
