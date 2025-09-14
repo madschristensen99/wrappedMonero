@@ -66,9 +66,11 @@
                 // signer,
             );
 
-            console.log("Found address", {userAddress});
+            console.log("Found address", { userAddress });
 
-            const provider = new ethers.BrowserProvider((window as any).ethereum);
+            const provider = new ethers.BrowserProvider(
+                (window as any).ethereum,
+            );
             const signer: JsonRpcSigner = await provider.getSigner();
             // Initialize cofhejs client with ethers
             const result = await cofhejs.initializeWithEthers({
@@ -80,7 +82,7 @@
             if (!result.success) {
                 throw new Error(`Couldn't initialize cofhejs ${result.error}`);
             }
-            console.log("cofhejs initialized", {result});
+            console.log("cofhejs initialized", { result });
             cofheClient = cofhejs;
 
             // Get network name
@@ -141,7 +143,7 @@
             encryptedBalance,
             FheTypes.Uint64,
             result.data.issuer,
-            result.data.getHash()
+            result.data.getHash(),
         );
 
         console.log("Unsealed balance:", unsealed);
@@ -262,9 +264,7 @@
         if (accounts.length == 0) {
             console.log("No previously connected accounts found");
         }
-        console.log(
-            "Auto-connecting to previously connected account...",
-        );
+        console.log("Auto-connecting to previously connected account...");
         await connectWallet();
     }
 
@@ -292,7 +292,8 @@
         if (!(window as any).ethereum) {
             return;
         }
-        (window as any).ethereum.on("accountsChanged",
+        (window as any).ethereum.on(
+            "accountsChanged",
             (accounts: string[]) => {
                 if (accounts.length === 0) {
                     // User disconnected
