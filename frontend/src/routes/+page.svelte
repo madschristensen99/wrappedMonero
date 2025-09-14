@@ -1,7 +1,7 @@
 <script lang="ts">
     import { onMount } from "svelte";
     import { ethers } from "ethers";
-    import { cofhejs } from "cofhejs/web";
+    import { cofhejs, FheTypes, Encryptable } from "cofhejs/web";
     import type { BrowserProvider, JsonRpcSigner, Contract } from "ethers";
 
     // Contract ABI will be loaded from abi.json
@@ -12,7 +12,6 @@
         "0xb087c13f03b0b5a303d919cbf4d732b835afe434";
 
     let provider: BrowserProvider | null = null;
-    let signer: JsonRpcSigner | null = null;
     let contract: Contract | null = null;
     let userAddress: string = "";
     let cofheClient: any = null;
@@ -21,7 +20,6 @@
     let walletConnected: boolean = false;
     let networkName: string = "";
     let balance: string = "-";
-    let totalSupply: string = "-";
     let activeTab: "balance" | "transfer" | "mint" = "balance";
     let loading: boolean = false;
     let errorMessage: string = "";
@@ -38,19 +36,12 @@
      * Load contract ABI from file
      */
     async function loadContractABI(): Promise<void> {
-        try {
-            const response = await fetch("./abi.json");
-            if (!response.ok) {
-                throw new Error(`Failed to load ABI: ${response.status}`);
-            }
-            CONTRACT_ABI = await response.json();
-            console.log("Contract ABI loaded successfully");
-        } catch (error) {
-            console.error("Error loading contract ABI:", error);
-            throw new Error(
-                "Failed to load contract ABI: " + (error as Error).message,
-            );
+        const response = await fetch("./abi.json");
+        if (!response.ok) {
+            throw new Error(`Failed to load ABI: ${response.status}`);
         }
+        CONTRACT_ABI = await response.json();
+        console.log("Contract ABI loaded successfully");
     }
 
     /**
@@ -61,74 +52,52 @@
             loading = true;
 
             // Switch to Sepolia network (11155111)
-            try {
-                await (window as any).ethereum.request({
-                    method: "wallet_switchEthereumChain",
-                    params: [{ chainId: "0xaa36a7" }],
-                });
-                console.log("Switched to Sepolia network");
-            } catch (switchError: any) {
-                // Network not added to MetaMask, add it
-                if (switchError.code === 4902) {
-                    await (window as any).ethereum.request({
-                        method: "wallet_addEthereumChain",
-                        params: [
-                            {
-                                chainId: "0xaa36a7",
-                                chainName: "Sepolia Testnet",
-                                rpcUrls: [
-                                    "https://ethereum-sepolia.therpc.io",
-                                ],
-                                nativeCurrency: {
-                                    name: "ETH",
-                                    symbol: "ETH",
-                                    decimals: 18,
-                                },
-                                blockExplorerUrls: [
-                                    "https://sepolia.etherscan.io",
-                                ],
-                            },
-                        ],
-                    });
-                } else {
-                    throw switchError;
-                }
-            }
 
-            const accounts = await provider!.send("eth_requestAccounts", []);
-            userAddress = accounts[0];
-            signer = await provider!.getSigner();
+            await (window as any).ethereum.request({
+                method: "wallet_switchEthereumChain",
+                params: [{ chainId: "0xaa36a7" }],
+            });
+            console.log("Switched to Sepolia network");
 
             // Create contract instance with signer for writes
             contract = new ethers.Contract(
                 CONTRACT_ADDRESS,
                 CONTRACT_ABI!,
-                signer,
+                // signer,
             );
 
-            // Initialize cofhejs client
-            await cofhejs.initializeWithEthers({
+            console.log("Found address", {userAddress});
+
+            const provider = new ethers.BrowserProvider((window as any).ethereum);
+            const signer: JsonRpcSigner = await provider.getSigner();
+            // Initialize cofhejs client with ethers
+            const result = await cofhejs.initializeWithEthers({
                 ethersProvider: provider,
                 ethersSigner: signer,
                 environment: "TESTNET",
             });
+            console.log(result);
+            if (!result.success) {
+                throw new Error(`Couldn't initialize cofhejs ${result.error}`);
+            }
+            console.log("cofhejs initialized", {result});
             cofheClient = cofhejs;
 
             // Get network name
             const network = await provider!.getNetwork();
             networkName = network.name || "Fhenix Network";
 
+            const accounts = await provider.send("eth_requestAccounts", []);
+            userAddress = accounts[0];
+
             walletConnected = true;
 
             // Load initial data
             await refreshBalance();
 
-            loading = false;
             showSuccess("Wallet connected successfully");
-        } catch (error) {
+        } finally {
             loading = false;
-            console.error("Error connecting wallet:", error);
-            showError("Failed to connect wallet: " + (error as Error).message);
         }
     }
 
@@ -141,125 +110,49 @@
             return;
         }
 
-        try {
-            // Create read-only contract instance
-            const readContract = new ethers.Contract(
-                CONTRACT_ADDRESS,
-                CONTRACT_ABI!,
-                provider,
-            );
+        // Create read-only contract instance
+        const readContract = new ethers.Contract(
+            CONTRACT_ADDRESS,
+            CONTRACT_ABI!,
+            provider,
+        );
 
-            // Try to get encrypted balance using cofhejs
-            try {
-                // Create permission for accessing encrypted balance
-                const permission = await cofheClient.generatePermission(
-                    CONTRACT_ADDRESS,
-                    provider,
-                );
-
-                // Get encrypted balance
-                const encryptedBalance = await readContract.balanceOfEncrypted(
-                    userAddress,
-                    permission,
-                );
-
-                // Unseal the encrypted balance
-                const unsealed = cofheClient.unseal(
-                    CONTRACT_ADDRESS,
-                    encryptedBalance,
-                );
-                balance = ethers.formatUnits(unsealed, 18);
-            } catch (balanceError) {
-                console.log(
-                    "Failed to get encrypted balance:",
-                    (balanceError as Error).message,
-                );
-                // Fallback to regular balance call (will fail for encrypted contracts)
-                try {
-                    const balanceResult =
-                        await readContract.balanceOf(userAddress);
-                    balance = ethers.formatEther(balanceResult);
-                } catch (fallbackError) {
-                    console.log(
-                        "Balance is encrypted and requires permission",
-                    );
-                    balance = "Encrypted (Permission Required)";
-                }
-            }
-
-            // Try to get encrypted total supply
-            try {
-                // Create permission for accessing encrypted total supply
-                const permission = await cofheClient.generatePermission(
-                    CONTRACT_ADDRESS,
-                    provider,
-                );
-
-                // Get encrypted total supply
-                const encryptedTotalSupply =
-                    await readContract.totalSupplyEncrypted(permission);
-
-                // Unseal the encrypted total supply
-                const unsealed = cofheClient.unseal(
-                    CONTRACT_ADDRESS,
-                    encryptedTotalSupply,
-                );
-                totalSupply = ethers.formatUnits(unsealed, 18);
-            } catch (supplyError) {
-                console.log(
-                    "Failed to get encrypted total supply:",
-                    (supplyError as Error).message,
-                );
-                // Fallback to regular total supply call (will fail for encrypted contracts)
-                try {
-                    const totalSupplyResult = await readContract.totalSupply();
-                    totalSupply = ethers.formatEther(totalSupplyResult);
-                } catch (fallbackError) {
-                    console.log(
-                        "Total supply is encrypted and requires permission",
-                    );
-                    totalSupply = "Encrypted (Permission Required)";
-                }
-            }
-        } catch (error) {
-            console.error("Error refreshing balance:", error);
-            showError(
-                "Failed to refresh balance: " + (error as Error).message,
-            );
+        // Get encrypted balance using cofhejs
+        const result = await cofhejs.createPermit({
+            type: "self",
+            issuer: userAddress,
+        });
+        if (!result.success) {
+            throw new Error("Couldn't create permit", result.error.toString());
         }
+
+        console.log("Created permit:", result);
+
+        // Get encrypted balance
+        const encryptedBalance = await readContract.balanceOfEncrypted(
+            userAddress,
+            result,
+        );
+
+        console.log("Encrypted balance result:", encryptedBalance);
+
+        // When creating a permit cofhejs will use it automatically, but you can pass it manually as well
+        const unsealed = await cofhejs.unseal(
+            encryptedBalance,
+            FheTypes.Uint64,
+            result.data.issuer,
+            result.data.getHash()
+        );
+
+        console.log("Unsealed balance:", unsealed);
+        balance = ethers.formatUnits(unsealed.toString(), 12); // Monero has 12 decimals
     }
 
     /**
      * Handle transfer form submission
      */
     async function handleTransfer(): Promise<void> {
-        if (!contract) {
-            showError("Please connect your wallet first");
-            return;
-        }
-
-        if (!ethers.isAddress(recipient)) {
-            showError("Invalid recipient address");
-            return;
-        }
-
-        const amountWei = ethers.parseEther(transferAmount);
-
-        try {
-            loading = true;
-            const tx = await contract.transfer(recipient, amountWei);
-            await tx.wait();
-
-            loading = false;
-            showSuccess("Transfer completed successfully");
-            recipient = "";
-            transferAmount = "";
-            await refreshBalance();
-        } catch (error) {
-            loading = false;
-            console.error("Error transferring tokens:", error);
-            showError("Transfer failed: " + (error as Error).message);
-        }
+        // TODO
     }
 
     /**
@@ -328,10 +221,8 @@
             txId = "";
             txSecret = "";
             receiverAddress = "";
-        } catch (error) {
+        } finally {
             loading = false;
-            console.error("Error requesting mint:", error);
-            showError("Mint request failed: " + (error as Error).message);
         }
     }
 
@@ -355,38 +246,26 @@
      * Copy text to clipboard
      */
     async function copyToClipboard(text: string): Promise<void> {
-        try {
-            await navigator.clipboard.writeText(text);
-            showSuccess("Copied to clipboard");
-        } catch (error) {
-            showError("Failed to copy to clipboard");
-        }
+        await navigator.clipboard.writeText(text);
+        showSuccess("Copied to clipboard");
     }
 
     /**
      * Try to auto-connect if previously connected
      */
     async function tryAutoConnect(): Promise<void> {
-        try {
-            // Check if already connected
-            const accounts = await (window as any).ethereum.request({
-                method: "eth_accounts",
-            });
+        // Check if already connected
+        const accounts = await (window as any).ethereum.request({
+            method: "eth_accounts",
+        });
 
-            if (accounts.length > 0) {
-                console.log(
-                    "Auto-connecting to previously connected account...",
-                );
-                await connectWallet();
-            } else {
-                console.log("No previously connected accounts found");
-            }
-        } catch (error) {
-            console.log(
-                "Auto-connect failed, user will need to connect manually:",
-                (error as Error).message,
-            );
+        if (accounts.length == 0) {
+            console.log("No previously connected accounts found");
         }
+        console.log(
+            "Auto-connecting to previously connected account...",
+        );
+        await connectWallet();
     }
 
     onMount(async () => {
@@ -399,45 +278,36 @@
             return;
         }
 
-        try {
-            // Load contract ABI first
-            await loadContractABI();
+        // Load contract ABI first
+        await loadContractABI();
 
-            // Request accounts
-            provider = new ethers.BrowserProvider((window as any).ethereum);
+        // Request accounts
 
-            // Try to auto-connect if previously connected
-            await tryAutoConnect();
+        // Try to auto-connect if previously connected
+        await tryAutoConnect();
 
-            console.log("App initialized successfully");
-        } catch (error) {
-            console.error("Error initializing app:", error);
-            showError(
-                "Failed to initialize application: " +
-                    (error as Error).message,
-            );
-        }
+        console.log("App initialized successfully");
 
         // Handle account changes
-        if ((window as any).ethereum) {
-            (window as any).ethereum.on(
-                "accountsChanged",
-                (accounts: string[]) => {
-                    if (accounts.length === 0) {
-                        // User disconnected
-                        location.reload();
-                    } else if (accounts[0] !== userAddress) {
-                        // Account changed
-                        location.reload();
-                    }
-                },
-            );
-
-            (window as any).ethereum.on("chainChanged", () => {
-                // Network changed
-                location.reload();
-            });
+        if (!(window as any).ethereum) {
+            return;
         }
+        (window as any).ethereum.on("accountsChanged",
+            (accounts: string[]) => {
+                if (accounts.length === 0) {
+                    // User disconnected
+                    location.reload();
+                } else if (accounts[0] !== userAddress) {
+                    // Account changed
+                    location.reload();
+                }
+            },
+        );
+
+        (window as any).ethereum.on("chainChanged", () => {
+            // Network changed
+            location.reload();
+        });
     });
 </script>
 
@@ -506,10 +376,6 @@
                 <p>
                     <strong>Balance:</strong>
                     <span>{balance}</span> WXMR
-                </p>
-                <p>
-                    <strong>Total Supply:</strong>
-                    <span>{totalSupply}</span> WXMR
                 </p>
             </div>
             <button class="btn btn-secondary" on:click={refreshBalance}>
