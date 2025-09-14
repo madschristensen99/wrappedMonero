@@ -59,7 +59,7 @@ async function main() {
     console.log("=== Monero Bridge - wxMR Mint ===");
     console.log("Account:", signer.address);
     
-    const contractAddress = "0x5A8Bde0AE3F9871e509264E9152B77841EfE10c5";
+    const contractAddress = process.env.WXMR_CONTRACT || "DEPLOY_NEW_CONTRACT_FIRST"; // ⚠️ Update after redeployment
     
     try {
         // Load contract

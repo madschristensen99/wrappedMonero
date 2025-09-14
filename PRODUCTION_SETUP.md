@@ -131,11 +131,18 @@ DATABASE_URL=sqlite:///path/to/database.db
 RELAY_API_URL=http://localhost:8080
 ```
 
-### Contract Verification
-The wxMR contract is deployed to Sepolia and uses:
-- **Real RISC Zero verifier**: Official on-chain verification
+### Contract Verification ⚠️ **MUST REDEPLOY**
+**The contract was updated with real RISC Zero verifier but IS NOT DEPLOYED**
+- **Real RISC Zero verifier**: Ready but needs deployment
 - **Production image ID**: Built from actual guest program
-- **Trusted setup**: No backdoors or admin keys
+- **Status**: Contract ABI changed - requires redeployment
+
+## Redeployment Required
+```bash
+cd contract
+npx hardhat run scripts/deploy.js --network sepolia
+# THEN update contract address in all configurations
+```
 
 ## Monitoring
 

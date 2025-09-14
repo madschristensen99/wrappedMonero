@@ -1,5 +1,7 @@
 # wxMR Bridge: Monero ↔ Ethereum Privacy Bridge
 
+> ⚠️ **CRITICAL**: Contract has been updated with real RISC Zero verifier. The old contract is OBSOLETE – **REDEPLOYMENT REQUIRED** for production use.
+
 A zero-knowledge privacy-preserving bridge enabling Monero (XMR) to be wrapped as ERC-20 tokens (wxMR) while maintaining transactional privacy.
 
 ## Contract Deployment
@@ -186,11 +188,11 @@ curl http://localhost:8080/v1/status/{transaction-uuid}
 
 ---
 
-## Deployment Status (✅ COMPLETE)
+## Deployment Status (🔄 NEEDS REDEPLOYMENT)
 
 | **Component** | **Status** | **Details** |
 | :--- | :--- | :--- |
-| wxMR Contract | **✅ PRODUCTION** | Real RISC Zero verifier deployed at `0x5A8Bde0AE3F9871e509264E9152B77841EfE10c5` |
+| wxMR Contract | **🔧 UPDATED** | Production RISC Zero verifier - ‼️ **REQUIRES REDEPLOYMENT** |
 | RISC Zero zkVM | **✅ PRODUCTION** | Real cryptographic STARK proofs operational |
 | FHE Keys | **✅ READY** | Generated: `fhe-engine/keys.fhe.{client,server}` |
 | Test Infrastructure | **✅ OPERATIONAL** | Full system testing complete |
