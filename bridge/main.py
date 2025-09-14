@@ -566,6 +566,12 @@ def process_revealed_txs(contract: Contract, w3: Web3) -> None:
                         request.txid.hex(),
                         state.confirmations,
                     )
+                else:
+                    logger.info(
+                        "Pending request %s with %d confirmations is already pending",
+                        request.txid.hex(),
+                        state.confirmations,
+                    )
             case XmrNotFound():
                 # Transaction not found, remove from pending if it was there
                 for pending_request in pending_requests:
