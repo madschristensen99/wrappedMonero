@@ -59,31 +59,31 @@
             });
             console.log("Switched to Sepolia network");
 
-            // Create contract instance with signer for writes
-            contract = new ethers.Contract(
-                CONTRACT_ADDRESS,
-                CONTRACT_ABI!,
-                // signer,
-            );
-
-            console.log("Found address", { userAddress });
-
             const provider = new ethers.BrowserProvider(
                 (window as any).ethereum,
             );
             const signer: JsonRpcSigner = await provider.getSigner();
+
+            // Create contract instance with signer for writes
+            contract = new ethers.Contract(
+                CONTRACT_ADDRESS,
+                CONTRACT_ABI!,
+                signer,
+            );
+
+            console.log("Found address", { userAddress });
             // Initialize cofhejs client with ethers
-            const result = await cofhejs.initializeWithEthers({
-                ethersProvider: provider,
-                ethersSigner: signer,
-                environment: "TESTNET",
-            });
-            console.log(result);
-            if (!result.success) {
-                throw new Error(`Couldn't initialize cofhejs ${result.error}`);
-            }
-            console.log("cofhejs initialized", { result });
-            cofheClient = cofhejs;
+            // const result = await cofhejs.initializeWithEthers({
+            //     ethersProvider: provider,
+            //     ethersSigner: signer,
+            //     environment: "NULL",
+            // });
+            // console.log(result);
+            // if (!result.success) {
+            //     throw new Error(`Couldn't initialize cofhejs ${result.error}`);
+            // }
+            // console.log("cofhejs initialized", { result });
+            // cofheClient = cofhejs;
 
             // Get network name
             const network = await provider!.getNetwork();

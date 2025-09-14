@@ -45,7 +45,7 @@ The system consists of three main components:
 
 ### How to demo
 
-Here's how to set up everything
+Here's how to **set up** everything
 
 1. Install dependencies for bridge  by running `uv sync` inside
    the `bridge/` directory.
@@ -56,12 +56,46 @@ Here's how to set up everything
 4. Create a Monero wallet that receives the XMR to be wrapped and make sure
    that it's available in a directory that `monero-wallet-rpc` can access
 
-Here's how to start up everything
+Here's how to **start up** everything
 
 1. Start the monero wallet rpc endpoint by running `bridge/bin/monero-cli`
 1. Start bridge by running `uv run ./main.py` inside the `bridge/` directory.
 2. Start the frontend by running `npm run dev` inside the `frontend/`
    directory.
+
+Here's how to make a demo transaction
+
+1. Open the frontend on <http://localhost:5173>
+2. Press on the **Transfer** button
+3. Press the **Copy** button under *Bridge Monero Address*
+![monero-address-copied](docs/monero-address-copied.png)
+4. In your Monero wallet, paste the *Bridge Monero Address* and send an arbitrary amount of XMR to this *Bridge Monero
+   address*. The screenshot shows how it looks like in **Feather** wallet
+![entering-bridge-monero-address](docs/entering-bridge-monero-address.png)
+5. Initiate the transaction. The screenshot shows how it looks like in
+   **Feather wallet** after you press the **Send** button.
+![feather-wallet-confirm](docs/feather-wallet-confirm.png)
+6. Confirm the transaction and review the transaction details. The following screenshots shows the confirmation notice after
+   pressing **Send** inside the *Confirm transaction* dialog and then
+   selecting **Show details**.
+![Screenshot showing the transaction sent confirmation](docs/feather-transaction-sent.png)
+![Screenshot showing the transaction details](docs/transaction-confirmation.png)
+7. Now copy the **Tx ID** and **Tx Secret Key** into the Monero Bridge website.
+   The **Transaction** details screen has two buttons **Copy Tx ID** and **Copy
+   TX Secret Key**. Press each button and then go to the matching fields
+   **Monero Transaction ID** and **Transaction Secret Key** and paste the
+   values there.
+![Screenshot showing the transaction id and secret in the Wrapped Monero UI](./request-mint-details.png)
+8. To receive the Wrapped Monero yourself, you can press the **Send to current
+   wallet address** button. If you want to mint the Wrapped Monero for someone
+   else, you can enter their wallet address as well.
+9. Press the **Request Mint** button. Your wallet provider then asks you to
+   confirm the transaction. The screenshot shows Metamask's **Transaction
+   request** screen. Press **Confirm**. Metamask shows a **Confirmed transaction**
+   after some time.
+![metamask-confirmed-transaction](docs/metamask-confirmed-transaction.png)
+10. You have now requested a mint. The bridge searches for your mint request
+    and gives you Wrapped Monero.
 
 
 
