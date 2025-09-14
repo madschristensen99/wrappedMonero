@@ -3,6 +3,13 @@ pragma solidity ^0.8.19;
 
 import {ERC20} from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import {FHE, euint64} from "@fhenixprotocol/cofhe-contracts/FHE.sol";
+import {Permissioned, Permission} from "../../../access/Permissioned.sol";
+
+import {IFHERC20} from "./IFHERC20.sol";
+
+error ErrorInsufficientFunds();
+error ERC20InvalidApprover(address);
+error ERC20InvalidSpender(address);
 
 /**
  * @title  Wrapped Monero (WXMR) – encrypted balances
@@ -11,7 +18,7 @@ import {FHE, euint64} from "@fhenixprotocol/cofhe-contracts/FHE.sol";
  *            1. user: requestMint(txSecret, receiver)
  *            2. authority: confirmMint(txSecret, amount)
  */
-contract WrappedMonero is ERC20 {
+contract WrappedMonero is ERC20, Permissioned {
     /* --------------------------------------------------------------------------
                                AUTHORITY
     -------------------------------------------------------------------------- */
@@ -22,10 +29,6 @@ contract WrappedMonero is ERC20 {
     -------------------------------------------------------------------------- */
     euint64 private _totalSupplyEnc;
     mapping(address => euint64) private _balancesEnc;
-
-    // decrypted caches
-    euint64 private _lastDecryptedSupply;
-    mapping(address => euint64) private _lastDecryptedBalance;
 
     /* --------------------------------------------------------------------------
                                MINT REQUESTS
@@ -92,39 +95,40 @@ contract WrappedMonero is ERC20 {
     }
 
     /* --------------------------------------------------------------------------
-                         PUBLIC VIEW DECRYPTED CACHES
+                         PUBLIC VIEW – ENCRYPTED ONLY
     -------------------------------------------------------------------------- */
-    function totalSupply() public view override returns (uint256) {
-        (uint256 v, bool ready) = FHE.getDecryptResultSafe(_lastDecryptedSupply);
-        if (!ready) revert("Supply not decrypted");
-        return v;
+    /// @dev Reverts on-plaintext balanceOf to enforce privacy
+    function balanceOf(address) public pure override returns (uint256) {
+        revert("Balance is encrypted");
     }
 
-    function balanceOf(address account) public view override returns (uint256) {
-        (uint256 v, bool ready) = FHE.getDecryptResultSafe(_lastDecryptedBalance[account]);
-        if (!ready) revert("Balance not decrypted");
-        return v;
+    /// @dev Reverts on-plaintext totalSupply to enforce privacy
+    function totalSupply() public pure override returns (uint256) {
+        revert("Total supply is encrypted");
     }
 
     /* --------------------------------------------------------------------------
-                         AUTHORITY DECRYPT REFRESH
+                         OWNER-CONTROLLED DECRYPTION
     -------------------------------------------------------------------------- */
-    function decryptTotalSupply() external {
-        require(msg.sender == AUTHORITY, "Not authority");
-        _lastDecryptedSupply = _totalSupplyEnc;
-        FHE.decrypt(_lastDecryptedSupply);
+    /// @notice Returns the encrypted balance ciphertext.
+    ///         Frontend must seal it with cofhejs.seal() before unsealing.
+    function balanceOfEncrypted(
+        address account,
+        Permission calldata auth
+    ) external view onlyPermitted(auth, account) returns (euint64) {
+        return _balancesEnc[account];
     }
 
-    function decryptBalance(address account) external {
-        require(msg.sender == AUTHORITY, "Not authority");
-        _lastDecryptedBalance[account] = _balancesEnc[account];
-        FHE.decrypt(_lastDecryptedBalance[account]);
+    /// @notice Returns the encrypted total-supply ciphertext.
+    function totalSupplyEncrypted(
+        Permission calldata auth
+    ) external view onlyPermitted(auth, AUTHORITY) returns (euint64) {
+        return _totalSupplyEnc;
     }
-
     /* --------------------------------------------------------------------------
                          ENCRYPTED TRANSFER
     -------------------------------------------------------------------------- */
-    function transfer(address to, uint64 amount) public returns (bool) {
+    function transfer(address to, uint64 amount) external returns (bool) {
         euint64 amtEnc = FHE.asEuint64(amount);
         _balancesEnc[msg.sender] = FHE.sub(_balancesEnc[msg.sender], amtEnc);
         _balancesEnc[to] = FHE.add(_balancesEnc[to], amtEnc);
