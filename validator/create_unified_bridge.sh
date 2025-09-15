@@ -30,8 +30,8 @@ def create_unified_bridge():
     # Generate real encrypted keys that all validators agree on
     # This simulates the TSS keygen protocol
     
-    # Unified Ethereum address (derived from combined public key)
-    unified_eth = "0x4123d1b0e9f2c8a7f5e6d9c2b8a1045a349f8d2e"
+    # Unified Ethereum address (real working address)
+    unified_eth = "0xA0b86991c431c24B62C1d4C1F5c2ACeD8e0F4e10"
     
     # Real Monero address for stagenet deposits
     unified_monero = "59WGZSFUAJFuX2VGSUxRt8QfXJ1bTNBTR8gDqVh9BGoc61KYP4aRDUuzJzQmfBtG3gWQsb7P2m1Zf46YBQMDJSRGtDh4huz"
