@@ -41,6 +41,104 @@ The system consists of three main components:
 ## Deployed Contract Address
 [0x25305b62299562197582eB87443B64B894685Fb4](https://sepolia.etherscan.io/address/0x25305b62299562197582eB87443B64B894685Fb4)
 
+## Validator Directory (Cryplography Infrastructure)
+
+### Overview
+The `validator/` directory contains the TSS (Threshold Signature Scheme) infrastructure for implementing secure cryptographic operations across a distributed network. This enables threshold signatures and live blockchain transaction execution for the WXMR bridge.
+
+### Directory Structure
+```
+validator/
+├── validator-tss                  # Compiled TSS validator binary
+├── configs/validator{0-6}.toml    # Individual validator configurations
+├── keys/                          # DKG-generated key shares
+│   ├── 0/keys_0_1.json           # Validator 0 key share
+│   ├── 1/keys_1_2.json           # Validator 1 key share
+│   └── ... through validator 6
+├── scripts/
+│   ├── run_validators.sh         # Start 7-validator network
+│   ├── check_status.sh          # Monitor network status
+│   └── start_dkg_ceremony.sh    # Run distributed key generation
+├── submit_tss_confirm_mint.py    # Transaction submission
+├── requirements.txt              # Python dependencies
+├── SETUP.md                     # Comprehensive setup guide
+└── env.py                      # Environment configuration
+```
+
+### Key Components
+
+#### 1. TSS Authority Address
+**`0x0ab60f2164615B720C38c6656Eb0420D718dfef6`** - Generated via DKG ceremony
+
+#### 2. Validator Network
+- **7 validators** (indices 0-6)
+- **4/7 threshold** for consensus
+- **Ports 8001-8007** respectively
+- **Sepolia RPC** integration
+
+#### 3. Core Files and Scripts
+
+**`run_validators.sh`** - One-command network start:
+```bash
+./run_validators.sh
+```
+
+**`submit_tss_confirm_mint.py`** - Transaction submission:
+```bash
+python3 submit_tss_confirm_mint.py --secret 0x123... --amount 1.5
+```
+
+**`check_status.sh`** - Network monitoring:
+```bash
+./check_status.sh
+```
+
+#### 4. Configuration
+Each validator uses individual `.toml` files for:
+- Network binding (ports 8001-8007)
+- Monero RPC connectivity
+- Ethereum Sepolia RPC setup
+- MPC parameters (4/7 threshold)
+- Key share paths
+
+#### 5. Cryptographic Setup
+- **Distributed Key Generation (DKG)** for shared secrets
+- **Threshold signatures** (TSS) for transaction authorization
+- **Ethereum addresses** derived from combined public keys
+- **Monero addresses** with proper derivation
+
+### Quick Start Commands
+
+```bash
+# 1. Build validator
+cd validator
+cargo build --release
+
+# 2. Start the network
+./run_validators.sh
+
+# 3. Monitor status
+./check_status.sh
+
+# 4. Submit test transaction
+python3 submit_tss_confirm_mint.py --secret 0xeeee... --amount 1.5
+
+# 5. Check logs
+tail -f logs/validator-0.log
+```
+
+### Demo Flow
+1. **Launch**: Run 7 validators on ports 8001-8007
+2. **Monitor**: Check network health with status script
+3. **Transact**: Submit transactions via Python script
+4. **Verify**: Confirmed transactions on Sepolia testnet
+
+### Security Features
+- Private keys never leave validator nodes
+- 4-of-7 consensus required for signatures
+- Deterministic key derivation
+- Secure RPC connections
+
 ## Usage
 
 ### How to demo

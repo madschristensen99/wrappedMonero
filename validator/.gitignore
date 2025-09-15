@@ -1,0 +1,27 @@
+/target/
+/Cargo.lock
+**/*.rs.bk
+.cargo/
+
+# Generated TSS keys - never commit these
+keys/
+**/*.json
+combined_bridge_keys.json
+
+# Env files
+.env
+.env.local
+
+# IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+*.out

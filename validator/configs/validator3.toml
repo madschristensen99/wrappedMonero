@@ -1,0 +1,66 @@
+[network]
+bind_address = "0.0.0.0:8004"
+timeout_ms = 5000
+
+[[network.peers]]
+id = 1
+address = "0.0.0.0:8001"
+url = "http://localhost:8001"
+
+[[network.peers]]
+id = 2
+address = "0.0.0.0:8002" 
+url = "http://localhost:8002"
+
+[[network.peers]]
+id = 3
+address = "0.0.0.0:8003"
+url = "http://localhost:8003"
+
+[[network.peers]]
+id = 4
+address = "0.0.0.0:8004"
+url = "http://localhost:8004"
+
+[[network.peers]]
+id = 5
+address = "0.0.0.0:8005"
+url = "http://localhost:8005"
+
+[[network.peers]]
+id = 6
+address = "0.0.0.0:8006"
+url = "http://localhost:8006"
+
+[[network.peers]]
+id = 7
+address = "0.0.0.0:8007"
+url = "http://localhost:8007"
+
+[mpc]
+threshold = 4
+total_parties = 7
+keygen_timeout_secs = 300
+signing_timeout_secs = 60
+key_gen_output_path = "./keys"
+
+[ethereum]
+rpc_url = "https://sepolia.gateway.tenderly.co"
+contract_address = "0x34c209a799b47A4ba5753E17A1Dbf2F5a612fd23"
+gas_limit = 900000
+max_gas_price = "50"
+
+[monero]
+rpc_url = "http://stagenet.xmr-tw.org:38081/json_rpc"
+address = "9wuZdcgYHVnNz68iXnjhf1xXr4CN6Q9C5wgd98TiBYMXq5oUqRcwEyVK5GHH6mhMM8xj4qibLzB9QNyVvGzE5cQS6QLh9vW"
+required_confirmations = 6
+check_interval_secs = 10
+
+[validators]
+validator_id = 3
+threshold = 4
+enable_consensus = true
+reshare_period_days = 30
+
+[validator]
+key_path = "./keys/3/keys_3_4.json"
