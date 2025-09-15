@@ -2,6 +2,8 @@
 
 A privacy-focused bridge between Monero (XMR) and Ethereum, featuring encrypted balances using Fhenix's Fully Homomorphic Encryption (FHE).
 
+![Photo of whiteboard showing the initial sequence chart for Wrapped Monero mints and burns](docs/whiteboard.jpg)
+
 **Note**: This is a demo for a very complex application. We have developed
 Wrapped Monero
 for evaluation on the Monero stagenet and the Ethereum Sepolia testnet. Please
@@ -166,24 +168,35 @@ Here's how to make a demo transaction
 1. Open the frontend on <http://localhost:5173>
 2. Press on the **Transfer** button
 3. Press the **Copy** button under *Bridge Monero Address*
+
 ![monero-address-copied](docs/monero-address-copied.png)
+
 4. In your Monero wallet, paste the *Bridge Monero Address* and send an arbitrary amount of XMR to this *Bridge Monero
    address*. The screenshot shows how it looks in **Feather** wallet
+
 ![entering-bridge-monero-address](docs/entering-bridge-monero-address.png)
+
 5. Initiate the transaction. The screenshot shows how it looks in
    **Feather wallet** after you press the **Send** button.
+
 ![feather-wallet-confirm](docs/feather-wallet-confirm.png)
+
 6. Confirm the transaction and review the transaction details. The following screenshots show the confirmation notice after
    pressing **Send** inside the *Confirm transaction* dialog and then
    selecting **Show details**.
+
 ![Screenshot showing the transaction sent confirmation](docs/feather-transaction-sent.png)
+
 ![Screenshot showing the transaction details](docs/transaction-confirmation.png)
+
 7. Now copy the **Tx ID** and **Tx Secret Key** into the Monero Bridge website.
    The **Transaction** details screen has two buttons **Copy Tx ID** and **Copy
    TX Secret Key**. Press each button and then go to the matching fields
    **Monero Transaction ID** and **Transaction Secret Key** and paste the
    values there.
+
 ![Screenshot showing the transaction id and secret in the Wrapped Monero UI](docs/request-mint-details.png)
+
 8. To receive the Wrapped Monero yourself, you can press the **Send to current
    wallet address** button. If you want to mint the Wrapped Monero for someone
    else, you can enter their wallet address as well.
@@ -191,9 +204,12 @@ Here's how to make a demo transaction
    confirm the transaction. The screenshot shows Metamask's **Transaction
    request** screen. Press **Confirm**. Metamask shows a **Confirmed transaction**
    after some time.
+
 ![Screenshot showing MetaMask confirmed transaction](docs/metamask-confirmed-transaction.png)
+
 10. You have now requested a mint. The bridge searches for your mint request
     and gives you Wrapped Monero.
+
 ![Screenshot showing the bridge's log output when it confirms a mint request](docs/bridge-mint-logs.png)
 
 Here's what the bridge outputs when it mints Wrapped Monero:
